@@ -22,6 +22,9 @@
   --radius-sm: 6px;
   --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
   --transition: 0.2s ease;
+  /* Slot machine dimensions — keep in sync with SLOT_ITEM_HEIGHT / SLOT_CONTAINER_HEIGHT in draw.js */
+  --slot-item-height: 56px;
+  --slot-container-height: 120px;
 }
 
 *, *::before, *::after {
@@ -634,7 +637,7 @@ select.form-input option {
 }
 
 .slot-reel-container {
-  height: 120px;
+  height: var(--slot-container-height);
   overflow: hidden;
   position: relative;
   background: var(--bg-primary);
@@ -673,7 +676,7 @@ select.form-input option {
 
 .slot-item {
   width: 100%;
-  height: 56px;
+  height: var(--slot-item-height);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -872,13 +875,13 @@ select.form-input option {
     font-size: 2.8rem;
   }
 
-  .slot-item {
-    font-size: 1.8rem;
-    height: 70px;
+  :root {
+    --slot-item-height: 70px;
+    --slot-container-height: 160px;
   }
 
-  .slot-reel-container {
-    height: 160px;
+  .slot-item {
+    font-size: 1.8rem;
   }
 
   .draw-athletes-list {

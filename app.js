@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const methodOverride = require('method-override');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 
 const app = express();
@@ -19,11 +20,27 @@ app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Rate limiting for API routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Çok fazla istek gönderildi. Lütfen bekleyin.' },
+});
+
+const viewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Routes
-app.use('/', require('./routes/views'));
-app.use('/api/categories', require('./routes/categories'));
-app.use('/api/athletes', require('./routes/athletes'));
-app.use('/api/matches', require('./routes/matches'));
+app.use('/', viewLimiter, require('./routes/views'));
+app.use('/api/categories', apiLimiter, require('./routes/categories'));
+app.use('/api/athletes', apiLimiter, require('./routes/athletes'));
+app.use('/api/matches', apiLimiter, require('./routes/matches'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

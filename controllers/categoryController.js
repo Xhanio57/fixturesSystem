@@ -1,6 +1,11 @@
 const Category = require('../models/Category');
 const Athlete = require('../models/Athlete');
 const Match = require('../models/Match');
+const mongoose = require('mongoose');
+
+function isValidObjectId(id) {
+  return mongoose.Types.ObjectId.isValid(id);
+}
 
 // GET all categories
 exports.getCategories = async (req, res) => {
@@ -15,6 +20,9 @@ exports.getCategories = async (req, res) => {
 // GET single category
 exports.getCategory = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
+    }
     const category = await Category.findById(req.params.id);
     if (!category) {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
@@ -38,6 +46,9 @@ exports.createCategory = async (req, res) => {
 // PUT update category
 exports.updateCategory = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
+    }
     const category = await Category.findById(req.params.id);
     if (!category) {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
@@ -56,6 +67,9 @@ exports.updateCategory = async (req, res) => {
 // DELETE category
 exports.deleteCategory = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
+    }
     const category = await Category.findById(req.params.id);
     if (!category) {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
@@ -78,6 +92,9 @@ exports.deleteCategory = async (req, res) => {
 // POST reset draw for a category
 exports.resetDraw = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
+    }
     const category = await Category.findById(req.params.id);
     if (!category) {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });

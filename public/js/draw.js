@@ -3,6 +3,16 @@
    GSAP Slot Machine Animation
    ============================================ */
 
+// Slot machine dimensions — read dynamically from CSS custom properties to stay in sync
+function getSlotDimensions() {
+  const style = getComputedStyle(document.documentElement);
+  const parseSize = (v) => parseInt(v) || 56;
+  return {
+    itemHeight: parseSize(style.getPropertyValue('--slot-item-height')),
+    containerHeight: parseSize(style.getPropertyValue('--slot-container-height')),
+  };
+}
+
 let currentCategory = null;
 let currentAthletes = [];
 let currentMatches = [];
@@ -203,7 +213,6 @@ async function runSlotAnimation() {
 
   const reel = document.getElementById('slot-reel');
   const label = document.querySelector('.slot-label');
-  const itemHeight = 56; // matches CSS .slot-item height
 
   for (let i = 0; i < currentMatches.length; i++) {
     const match = currentMatches[i];
@@ -217,23 +226,24 @@ async function runSlotAnimation() {
     label.textContent = `Maç ${i + 1}: Eşleşme çekiliyor...`;
 
     // Animate Athlete A
-    await animateSlot(reel, itemHeight, currentAthletes, aName, label, `Maç ${i + 1} — Oyuncu A`);
+    await animateSlot(reel, currentAthletes, aName, label, `Maç ${i + 1} — Oyuncu A`);
     await sleep(600);
 
     // Animate Athlete B
-    await animateSlot(reel, itemHeight, currentAthletes, bName, label, `Maç ${i + 1} — Oyuncu B`);
+    await animateSlot(reel, currentAthletes, bName, label, `Maç ${i + 1} — Oyuncu B`);
     await sleep(900);
   }
 
   label.textContent = '✓ Kura Tamamlandı';
 }
 
-function animateSlot(reel, itemHeight, athletes, winnerName, label, labelText) {
+function animateSlot(reel, athletes, winnerName, label, labelText) {
   return new Promise((resolve) => {
     const names = athletes.map((a) => `${a.lastName}, ${a.firstName}`);
     if (!names.includes(winnerName)) names.push(winnerName);
 
     const items = buildReelItems(names, winnerName);
+    const { itemHeight, containerHeight } = getSlotDimensions();
 
     // Build DOM
     reel.innerHTML = items
@@ -244,7 +254,7 @@ function animateSlot(reel, itemHeight, athletes, winnerName, label, labelText) {
       .join('');
 
     const totalHeight = items.length * itemHeight;
-    const centerOffset = Math.floor((120 - itemHeight) / 2); // center in 120px container
+    const centerOffset = Math.floor((containerHeight - itemHeight) / 2);
     const finalY = -(totalHeight - itemHeight - centerOffset);
 
     // GSAP tween: start fast, ease to a stop

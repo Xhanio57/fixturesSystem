@@ -1,11 +1,19 @@
 const Athlete = require('../models/Athlete');
 const Category = require('../models/Category');
+const mongoose = require('mongoose');
+
+function isValidObjectId(id) {
+  return mongoose.Types.ObjectId.isValid(id);
+}
 
 // GET athletes (optionally by category)
 exports.getAthletes = async (req, res) => {
   try {
     const filter = {};
     if (req.query.categoryId) {
+      if (!isValidObjectId(req.query.categoryId)) {
+        return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
+      }
       filter.category = req.query.categoryId;
     }
     const athletes = await Athlete.find(filter)
@@ -20,6 +28,9 @@ exports.getAthletes = async (req, res) => {
 // GET single athlete
 exports.getAthlete = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz sporcu ID' });
+    }
     const athlete = await Athlete.findById(req.params.id).populate('category');
     if (!athlete) {
       return res.status(404).json({ success: false, message: 'Sporcu bulunamadı' });
@@ -55,6 +66,12 @@ exports.createAthlete = async (req, res) => {
 // PUT update athlete (also handles category transfer)
 exports.updateAthlete = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz sporcu ID' });
+    }
+    if (req.body.category && !isValidObjectId(req.body.category)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
+    }
     const athlete = await Athlete.findById(req.params.id).populate('category');
     if (!athlete) {
       return res.status(404).json({ success: false, message: 'Sporcu bulunamadı' });
@@ -92,6 +109,9 @@ exports.updateAthlete = async (req, res) => {
 // DELETE athlete
 exports.deleteAthlete = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz sporcu ID' });
+    }
     const athlete = await Athlete.findById(req.params.id).populate('category');
     if (!athlete) {
       return res.status(404).json({ success: false, message: 'Sporcu bulunamadı' });

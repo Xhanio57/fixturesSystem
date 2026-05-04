@@ -1,6 +1,11 @@
 const Match = require('../models/Match');
 const Athlete = require('../models/Athlete');
 const Category = require('../models/Category');
+const mongoose = require('mongoose');
+
+function isValidObjectId(id) {
+  return mongoose.Types.ObjectId.isValid(id);
+}
 
 /**
  * Next power of 2 >= n
@@ -23,8 +28,12 @@ function shuffle(arr) {
 }
 
 /**
- * Build bracket slots: seeded athletes go to opposite ends (first & last),
- * rest are randomly distributed in between.
+ * Place seeded athletes at key bracket positions so they are in different quadrants:
+ *   seed[0] -> slot 0 (top)
+ *   seed[1] -> slot bracketSize-1 (bottom)
+ *   seed[2] -> slot bracketSize/2 (middle-top of second half)
+ *   seed[3] -> slot bracketSize/2-1 (middle-bottom of first half)
+ * Non-seeded athletes fill remaining slots randomly.
  */
 function buildBracketSlots(athletes, bracketSize) {
   const seeded = athletes.filter((a) => a.isSeeded);
@@ -83,6 +92,9 @@ function generateFirstRoundMatches(slots, categoryId) {
 // POST /api/matches/draw/:categoryId — run draw for a category
 exports.runDraw = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.categoryId)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
+    }
     const category = await Category.findById(req.params.categoryId);
     if (!category) {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
@@ -129,6 +141,9 @@ exports.runDraw = async (req, res) => {
 // GET /api/matches/:categoryId — get all matches for a category
 exports.getMatches = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.categoryId)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
+    }
     const matches = await Match.find({ categoryId: req.params.categoryId })
       .populate('athleteA', 'firstName lastName club isSeeded')
       .populate('athleteB', 'firstName lastName club isSeeded')
@@ -143,6 +158,12 @@ exports.getMatches = async (req, res) => {
 // PUT /api/matches/:matchId/winner — set winner for a match
 exports.setWinner = async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.matchId)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz maç ID' });
+    }
+    if (req.body.winnerId && !isValidObjectId(req.body.winnerId)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz winner ID' });
+    }
     const match = await Match.findById(req.params.matchId);
     if (!match) {
       return res.status(404).json({ success: false, message: 'Maç bulunamadı' });
@@ -190,7 +211,7 @@ async function advanceToNextRound(match) {
       categoryId: match.categoryId,
       roundNumber: match.roundNumber,
     });
-    if (currentRoundCount < 2) return; // Final already done
+    if (currentRoundCount < 2) return; // Only one match in current round means it's already the final — no next round needed
     nextMatch = new Match({
       categoryId: match.categoryId,
       roundNumber: nextRound,
