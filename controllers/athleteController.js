@@ -44,18 +44,23 @@ exports.getAthlete = async (req, res) => {
 // POST create athlete
 exports.createAthlete = async (req, res) => {
   try {
+    // Validate and extract only allowed fields
+    const { firstName, lastName, club, category, isSeeded } = req.body;
+    if (!category || !isValidObjectId(category)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz veya eksik kategori ID' });
+    }
     // Check if category draw is completed
-    const category = await Category.findById(req.body.category);
-    if (!category) {
+    const categoryDoc = await Category.findById(category);
+    if (!categoryDoc) {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
     }
-    if (category.isDrawCompleted) {
+    if (categoryDoc.isDrawCompleted) {
       return res.status(400).json({
         success: false,
         message: 'Bu kategoride kura tamamlanmış. Sporcu eklenemez.',
       });
     }
-    const athlete = await Athlete.create(req.body);
+    const athlete = await Athlete.create({ firstName, lastName, club, category, isSeeded: !!isSeeded });
     const populated = await Athlete.findById(athlete._id).populate('category', 'name');
     res.status(201).json({ success: true, data: populated });
   } catch (err) {
@@ -96,7 +101,15 @@ exports.updateAthlete = async (req, res) => {
         });
       }
     }
-    const updated = await Athlete.findByIdAndUpdate(req.params.id, req.body, {
+    // Build update with only allowed fields
+    const allowedFields = ['firstName', 'lastName', 'club', 'category', 'isSeeded'];
+    const updateData = {};
+    allowedFields.forEach((f) => {
+      if (req.body[f] !== undefined) updateData[f] = req.body[f];
+    });
+    if (updateData.isSeeded !== undefined) updateData.isSeeded = !!updateData.isSeeded;
+
+    const updated = await Athlete.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
     }).populate('category', 'name');
