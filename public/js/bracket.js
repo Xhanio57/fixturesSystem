@@ -144,9 +144,28 @@ function buildMainBracketSvg(matches) {
   // Match boxes
   Object.values(matchPos).forEach(({ x, y, w, h, match }) => {
     const g = svgEl('g');
+    g.setAttribute('data-match-id', match._id || '');
     const cls = match.winner ? 'bracket-match-rect highlight' : 'bracket-match-rect';
     g.appendChild(svgEl('rect', { x, y, width: w, height: h, rx: 6, class: cls }));
     g.appendChild(svgEl('line', { x1: x, y1: y + h / 2, x2: x + w, y2: y + h / 2, stroke: 'var(--border)', 'stroke-width': 1 }));
+
+    // Invisible hit-rects for fly-to-bracket targeting
+    const hitA = svgEl('rect', {
+      x, y, width: w, height: h / 2,
+      fill: 'transparent',
+      id: `bracket-slot-${match._id}-A`,
+      'data-match-id': match._id || '',
+      'data-slot': 'A',
+    });
+    const hitB = svgEl('rect', {
+      x, y: y + h / 2, width: w, height: h / 2,
+      fill: 'transparent',
+      id: `bracket-slot-${match._id}-B`,
+      'data-match-id': match._id || '',
+      'data-slot': 'B',
+    });
+    g.appendChild(hitA);
+    g.appendChild(hitB);
 
     // Pool badge
     if (match.pool && ['A','B','C','D'].includes(match.pool)) {
@@ -268,13 +287,19 @@ function athleteTextSvg(athlete, isBye, winner, x, y) {
     label = 'BYE';
     cls = 'bracket-text bye';
   } else if (athlete) {
-    label = `${athlete.lastName}, ${athlete.firstName}`;
+    // Format: "LASTNAME Firstname, COUNTRY/Club"  (mimic Baltic Judo Championships style)
+    const last = (athlete.lastName || '').toUpperCase();
+    const first = athlete.firstName || '';
+    const country = athlete.country || '';
+    const club = athlete.club || '';
+    const suffix = [country, club].filter(Boolean).join('/');
+    label = suffix ? `${last} ${first}, ${suffix}` : `${last} ${first}`;
     if (athlete.seedIndex) cls = 'bracket-text seeded';
     if (winner && String(winner._id || winner) === String(athlete._id)) cls += ' winner';
   }
 
   text.setAttribute('class', cls);
-  text.textContent = truncateBracket(label, 24);
+  text.textContent = truncateBracket(label, 28);
   return text;
 }
 

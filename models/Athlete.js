@@ -17,6 +17,13 @@ const AthleteSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    // 3-letter country code, e.g. TUR, LAT, LTU, EST
+    country: {
+      type: String,
+      trim: true,
+      default: '',
+      maxlength: 10,
+    },
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Category',

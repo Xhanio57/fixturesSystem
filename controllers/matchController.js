@@ -46,12 +46,17 @@ function poolForSlot(slotIndex, bracketSize) {
      Seed 2 → slot last       (Pool D bottom = "D16")
      Seed 3 → slot half       (Pool C top   = "C9")
      Seed 4 → slot half-1     (Pool B bottom = "B8")
+   BYE distribution: spread BYEs evenly across pools.
+     Adjacent slots of seeded athletes get BYEs first.
+     Remaining BYEs balanced: floor(total/4) per pool.
    Club-clash prevention: after initial placement, scan each pool
    for two athletes from the same club and swap one of them with
    an athlete in a different pool (skipping seeded athletes).
 ───────────────────────────────────────────────────────────── */
 function buildBracketWithSmartSwap(athletes, bracketSize) {
-  const slots = new Array(bracketSize).fill(null);
+  const n = athletes.length;
+  const totalBYEs = bracketSize - n;
+  const poolSize = Math.max(bracketSize / 4, 1);
 
   // Sort seeded athletes by seedIndex (1 first)
   const seeded = athletes
@@ -60,25 +65,68 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
   const nonSeeded = athletes.filter((a) => !a.seedIndex);
   shuffle(nonSeeded);
 
+  const slots = new Array(bracketSize).fill(null); // null = BYE
+
   // Fixed canonical seed positions
   const seedPositions = [
-    0,                              // Seed 1: A1
-    bracketSize - 1,                // Seed 2: D last
-    Math.floor(bracketSize / 2),    // Seed 3: C first
-    Math.floor(bracketSize / 2) - 1 // Seed 4: B last
+    0,                                // Seed 1: A1
+    bracketSize - 1,                  // Seed 2: D last
+    Math.floor(bracketSize / 2),      // Seed 3: C first
+    Math.floor(bracketSize / 2) - 1,  // Seed 4: B last
   ];
 
   seeded.forEach((ath, i) => {
     if (i < seedPositions.length) slots[seedPositions[i]] = ath;
   });
 
-  // Fill remaining slots with extra seeds + non-seeded
-  const remaining = [...seeded.slice(seedPositions.length), ...nonSeeded];
+  // ── Balanced BYE distribution ──
+  // Phase 1: seed adjacent slots get BYEs first (seeded athletes get a bye in R1)
+  const adjacentOfSeed = [1, bracketSize - 2, Math.floor(bracketSize / 2) + 1, Math.floor(bracketSize / 2) - 2];
+  const byeSet = new Set();
+  let byesUsed = 0;
+  for (let i = 0; i < Math.min(seeded.length, adjacentOfSeed.length) && byesUsed < totalBYEs; i++) {
+    const adj = adjacentOfSeed[i];
+    // Only assign as BYE if the adjacent slot is not occupied by another seed
+    if (!byeSet.has(adj) && slots[adj] === null) {
+      byeSet.add(adj);
+      byesUsed++;
+    }
+  }
+
+  // Phase 2: remaining BYEs distributed evenly across pools
+  if (bracketSize >= 8 && byesUsed < totalBYEs) {
+    const remaining = totalBYEs - byesUsed;
+    const byesPerPool = new Array(4).fill(Math.floor(remaining / 4));
+    for (let i = 0; i < remaining % 4; i++) byesPerPool[i]++;
+
+    for (let poolIdx = 0; poolIdx < 4; poolIdx++) {
+      const start = poolIdx * poolSize;
+      const end = start + poolSize;
+      // Free slots in this pool (not seeds, not already-bye)
+      const poolFree = [];
+      for (let i = start; i < end; i++) {
+        if (slots[i] === null && !byeSet.has(i)) poolFree.push(i);
+      }
+      // Mark the last N as BYEs (bottom of each pool)
+      const poolBYECount = Math.min(byesPerPool[poolIdx], poolFree.length);
+      for (let i = poolFree.length - poolBYECount; i < poolFree.length; i++) {
+        byeSet.add(poolFree[i]);
+        byesUsed++;
+      }
+    }
+  }
+
+  // ── Fill non-BYE slots with remaining athletes ──
+  const remaining = [...seeded.slice(Math.min(seeded.length, seedPositions.length)), ...nonSeeded];
   let ri = 0;
   for (let i = 0; i < bracketSize; i++) {
-    if (slots[i] === null && ri < remaining.length) {
-      slots[i] = remaining[ri++];
+    if (slots[i] === null && !byeSet.has(i)) {
+      if (ri < remaining.length) slots[i] = remaining[ri++];
     }
+  }
+  // Any athletes still unplaced (shouldn't happen, but safety)
+  for (let i = 0; i < bracketSize && ri < remaining.length; i++) {
+    if (slots[i] === null && !byeSet.has(i)) slots[i] = remaining[ri++];
   }
 
   // ── Smart Swap: resolve club conflicts within each pool ──
@@ -294,10 +342,34 @@ exports.runDraw = async (req, res) => {
     );
 
     const populated = await Match.find({ categoryId: category._id })
-      .populate('athleteA', 'firstName lastName club seedIndex isSeeded')
-      .populate('athleteB', 'firstName lastName club seedIndex isSeeded')
+      .populate('athleteA', 'firstName lastName club country seedIndex isSeeded')
+      .populate('athleteB', 'firstName lastName club country seedIndex isSeeded')
       .populate('winner', 'firstName lastName')
       .sort({ roundNumber: 1, matchIndex: 1 });
+
+    // Emit real-time draw event to all spectator clients
+    const io = req.app.get('io');
+    if (io) {
+      // Build a lightweight athlete list for the animation
+      const athleteList = athletes.map((a) => ({
+        _id: String(a._id),
+        firstName: a.firstName,
+        lastName: a.lastName,
+        club: a.club || '',
+        country: a.country || '',
+        seedIndex: a.seedIndex || null,
+      }));
+      io.emit('draw:complete', {
+        categoryId: String(category._id),
+        categoryName: category.name,
+        gender: category.gender,
+        ageGroup: category.ageGroup,
+        bracketType: category.bracketType,
+        bracketSize,
+        matches: populated,
+        athletes: athleteList,
+      });
+    }
 
     res.json({ success: true, data: populated, bracketSize, bracketType: category.bracketType });
   } catch (err) {
@@ -312,8 +384,8 @@ exports.getMatches = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Geçersiz kategori ID' });
     }
     const matches = await Match.find({ categoryId: req.params.categoryId })
-      .populate('athleteA', 'firstName lastName club seedIndex isSeeded')
-      .populate('athleteB', 'firstName lastName club seedIndex isSeeded')
+      .populate('athleteA', 'firstName lastName club country seedIndex isSeeded')
+      .populate('athleteB', 'firstName lastName club country seedIndex isSeeded')
       .populate('winner', 'firstName lastName')
       .sort({ roundNumber: 1, matchIndex: 1 });
     res.json({ success: true, data: matches });
@@ -373,9 +445,20 @@ exports.setWinner = async (req, res) => {
     }
 
     const populated = await Match.findById(match._id)
-      .populate('athleteA', 'firstName lastName club seedIndex isSeeded')
-      .populate('athleteB', 'firstName lastName club seedIndex isSeeded')
+      .populate('athleteA', 'firstName lastName club country seedIndex isSeeded')
+      .populate('athleteB', 'firstName lastName club country seedIndex isSeeded')
       .populate('winner', 'firstName lastName');
+
+    // Emit real-time score update
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('score:update', {
+        categoryId: String(match.categoryId),
+        matchDbId: String(match._id),
+        matchID: match.matchID,
+        winnerId: String(winnerId),
+      });
+    }
 
     res.json({ success: true, data: populated });
   } catch (err) {

@@ -45,7 +45,7 @@ exports.getAthlete = async (req, res) => {
 exports.createAthlete = async (req, res) => {
   try {
     // Validate and extract only allowed fields
-    const { firstName, lastName, club, category, isSeeded, seedIndex } = req.body;
+    const { firstName, lastName, club, country, category, isSeeded, seedIndex } = req.body;
     if (!category || !isValidObjectId(category)) {
       return res.status(400).json({ success: false, message: 'Geçersiz veya eksik kategori ID' });
     }
@@ -70,6 +70,7 @@ exports.createAthlete = async (req, res) => {
       firstName: String(firstName),
       lastName: String(lastName),
       club: club ? String(club) : '',
+      country: country ? String(country).toUpperCase().slice(0, 10) : '',
       category,
       seedIndex: parsedSeedIndex,
       isSeeded: parsedSeedIndex !== null,
@@ -121,6 +122,7 @@ exports.updateAthlete = async (req, res) => {
     if (req.body.firstName !== undefined) updateData.firstName = String(req.body.firstName);
     if (req.body.lastName !== undefined) updateData.lastName = String(req.body.lastName);
     if (req.body.club !== undefined) updateData.club = String(req.body.club);
+    if (req.body.country !== undefined) updateData.country = String(req.body.country).toUpperCase().slice(0, 10);
     if (req.body.category !== undefined) updateData.category = String(req.body.category);
     // Handle seedIndex
     if (req.body.seedIndex !== undefined) {

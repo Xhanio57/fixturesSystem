@@ -169,6 +169,7 @@ function renderAthletes() {
           ${ath.isWinner ? '<span class="badge badge-winner">🏆 Şampiyon</span>' : ''}
         </div>
         <div class="item-meta">
+          ${ath.country ? `<span class="badge badge-country">${escHtml(ath.country)}</span> ` : ''}
           ${ath.club ? escHtml(ath.club) + ' · ' : ''}
           ${ath.category ? escHtml(ath.category.name) : ''}
           ${ath.category && ath.category.drawStatus === 'Completed' ? '<span class="badge-done">Kura Tamamlandı</span>' : ''}
@@ -191,6 +192,7 @@ async function handleAddAthlete(e) {
     firstName: document.getElementById('ath-firstName').value.trim(),
     lastName: document.getElementById('ath-lastName').value.trim(),
     club: document.getElementById('ath-club').value.trim(),
+    country: (document.getElementById('ath-country').value || '').trim().toUpperCase(),
     category: document.getElementById('ath-category').value,
     seedIndex: seedVal ? Number(seedVal) : null,
   };
@@ -203,6 +205,7 @@ async function handleAddAthlete(e) {
     document.getElementById('ath-firstName').value = '';
     document.getElementById('ath-lastName').value = '';
     document.getElementById('ath-club').value = '';
+    document.getElementById('ath-country').value = '';
     document.getElementById('ath-seedIndex').value = '';
     showToast('Sporcu eklendi', 'success');
     await loadAthletes();
@@ -229,6 +232,7 @@ function openEditModal(id) {
   document.getElementById('edit-firstName').value = ath.firstName;
   document.getElementById('edit-lastName').value = ath.lastName;
   document.getElementById('edit-club').value = ath.club || '';
+  document.getElementById('edit-country').value = ath.country || '';
   document.getElementById('edit-seedIndex').value = ath.seedIndex || '';
   populateCategorySelects();
   document.getElementById('edit-category').value = ath.category ? ath.category._id : '';
@@ -246,6 +250,7 @@ async function handleEditSave() {
     firstName: document.getElementById('edit-firstName').value.trim(),
     lastName: document.getElementById('edit-lastName').value.trim(),
     club: document.getElementById('edit-club').value.trim(),
+    country: (document.getElementById('edit-country').value || '').trim().toUpperCase(),
     category: document.getElementById('edit-category').value,
     seedIndex: seedVal ? Number(seedVal) : null,
   };

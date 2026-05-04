@@ -100,14 +100,14 @@
 
         </div>
 
-        <!-- Bracket / fixture tree -->
-        <div class="bracket-section" id="bracket-section">
-          <h3 class="panel-subtitle bracket-subtitle">
-            Fikstür Ağacı
-            <span id="bracket-type-badge" class="badge ml-2 text-xs"></span>
-          </h3>
-          <div id="bracket-container" class="bracket-container"></div>
-        </div>
+          <div class="bracket-section" id="bracket-section">
+            <h3 class="panel-subtitle bracket-subtitle">
+              Fikstür Ağacı
+              <span id="bracket-type-badge" class="badge ml-2 text-xs"></span>
+              <button id="pdf-btn" class="btn btn-sm btn-secondary ml-4" style="float:right;display:none;" onclick="exportPDF()">📄 PDF İndir</button>
+            </h3>
+            <div id="bracket-container" class="bracket-container"></div>
+          </div>
 
       </div>
     </main>
@@ -119,8 +119,10 @@
   <!-- Toast notification -->
   <div id="toast" class="toast hidden"></div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script src="/js/draw.js"></script>
   <script src="/js/bracket.js"></script>
+  <script src="/js/pdf-export.js"></script>
 </body>
 </html>
 

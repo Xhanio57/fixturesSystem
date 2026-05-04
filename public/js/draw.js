@@ -121,13 +121,16 @@ function renderDrawContent() {
 
   // Draw button state
   const drawBtn = document.getElementById('draw-btn');
+  const pdfBtn = document.getElementById('pdf-btn');
   const drawCompleted = currentCategory.drawStatus === 'Completed';
   if (drawCompleted) {
     drawBtn.disabled = true;
     drawBtn.textContent = '✓ Kura Çekildi';
+    if (pdfBtn) pdfBtn.style.display = '';
   } else {
     drawBtn.disabled = false;
     drawBtn.textContent = '🎯 Kura Başlat';
+    if (pdfBtn) pdfBtn.style.display = 'none';
   }
 
   // Bracket
@@ -212,6 +215,10 @@ async function runDraw() {
 
     drawBtn.textContent = '✓ Kura Çekildi';
     drawBtn.disabled = true;
+
+    // Show PDF button
+    const pdfBtn = document.getElementById('pdf-btn');
+    if (pdfBtn) pdfBtn.style.display = '';
 
     // Show full bracket
     document.getElementById('bracket-section').classList.remove('hidden');
