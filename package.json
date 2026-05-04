@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/gsap/dist/gsap.min.js','public/js/gsap.min.js')\""
+    "postinstall": "node scripts/copy-gsap.js"
   },
   "dependencies": {
     "dotenv": "^16.3.1",
