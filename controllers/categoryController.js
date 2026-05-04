@@ -53,12 +53,11 @@ exports.updateCategory = async (req, res) => {
     if (!category) {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
     }
-    // Build update with only allowed fields
-    const allowedFields = ['name', 'gender', 'ageGroup'];
+    // Build update with only allowed fields, cast to expected types
     const updateData = {};
-    allowedFields.forEach((f) => {
-      if (req.body[f] !== undefined) updateData[f] = req.body[f];
-    });
+    if (req.body.name !== undefined) updateData.name = String(req.body.name);
+    if (req.body.gender !== undefined) updateData.gender = String(req.body.gender);
+    if (req.body.ageGroup !== undefined) updateData.ageGroup = String(req.body.ageGroup);
 
     const updated = await Category.findByIdAndUpdate(req.params.id, updateData, {
       new: true,

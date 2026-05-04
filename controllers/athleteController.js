@@ -82,8 +82,10 @@ exports.updateAthlete = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Sporcu bulunamadı' });
     }
     // If category is being changed, check target category draw status
-    if (req.body.category && req.body.category !== String(athlete.category._id)) {
-      const targetCategory = await Category.findById(req.body.category);
+    // req.body.category already validated as valid ObjectId above
+    const newCategoryId = req.body.category ? String(req.body.category) : null;
+    if (newCategoryId && newCategoryId !== String(athlete.category._id)) {
+      const targetCategory = await Category.findById(newCategoryId);
       if (!targetCategory) {
         return res.status(404).json({ success: false, message: 'Hedef kategori bulunamadı' });
       }
@@ -101,13 +103,13 @@ exports.updateAthlete = async (req, res) => {
         });
       }
     }
-    // Build update with only allowed fields
-    const allowedFields = ['firstName', 'lastName', 'club', 'category', 'isSeeded'];
+    // Build update with only allowed fields, cast to expected types
     const updateData = {};
-    allowedFields.forEach((f) => {
-      if (req.body[f] !== undefined) updateData[f] = req.body[f];
-    });
-    if (updateData.isSeeded !== undefined) updateData.isSeeded = !!updateData.isSeeded;
+    if (req.body.firstName !== undefined) updateData.firstName = String(req.body.firstName);
+    if (req.body.lastName !== undefined) updateData.lastName = String(req.body.lastName);
+    if (req.body.club !== undefined) updateData.club = String(req.body.club);
+    if (req.body.category !== undefined) updateData.category = String(req.body.category);
+    if (req.body.isSeeded !== undefined) updateData.isSeeded = !!req.body.isSeeded;
 
     const updated = await Athlete.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
