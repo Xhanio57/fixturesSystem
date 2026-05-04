@@ -20,8 +20,9 @@ async function exportPDF(category, matches, athletes) {
     return;
   }
 
-  // Load jsPDF from the CDN if it's not already bundled
+  // Load jsPDF and html2canvas from CDN if not already available
   await ensureJsPDF();
+  await ensureHtml2Canvas();
 
   const { jsPDF } = window.jspdf;
   if (!jsPDF) {
@@ -64,6 +65,12 @@ async function exportPDF(category, matches, athletes) {
 async function ensureJsPDF() {
   if (window.jspdf && window.jspdf.jsPDF) return;
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+}
+
+// ─── Ensure html2canvas is loaded (CDN) ──────
+async function ensureHtml2Canvas() {
+  if (window.html2canvas) return;
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
 }
 
 function loadScript(src) {

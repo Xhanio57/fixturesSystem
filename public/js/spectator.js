@@ -161,15 +161,8 @@ function renderSpecBracket() {
   if (!container) return;
 
   if (specMatches.length > 0) {
-    // Temporarily swap IDs so renderBracket targets the right container
-    const realContainer = document.getElementById('bracket-container');
-    if (realContainer) realContainer.id = '_bracket-hidden';
-    container.id = 'bracket-container';
-
-    renderBracket(specMatches, specCategory);
-
-    container.id = 'spec-bracket-container';
-    if (realContainer) realContainer.id = 'bracket-container';
+    // Pass the spectator container directly — no ID-swap needed
+    renderBracket(specMatches, specCategory, container);
   } else {
     container.innerHTML = '<p class="text-muted" style="font-size: 1.2rem; padding: 40px;">Henüz kura çekilmemiş.</p>';
   }

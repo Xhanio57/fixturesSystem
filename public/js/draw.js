@@ -223,6 +223,11 @@ async function runDraw() {
     // Show full bracket
     document.getElementById('bracket-section').classList.remove('hidden');
     renderBracket(currentMatches, currentCategory);
+    // Scroll bracket into view after animation
+    setTimeout(() => {
+      const bs = document.getElementById('bracket-section');
+      if (bs) bs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
     showToast('Kura başarıyla tamamlandı! 🎉', 'success');
   } catch (err) {
     showToast(err.message, 'error');

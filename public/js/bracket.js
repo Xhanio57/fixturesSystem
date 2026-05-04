@@ -5,12 +5,14 @@
    ============================================ */
 
 /**
- * renderBracket(matches, category)
- * matches: populated Match array
- * category: Category object (or just a name string for backward compat)
+ * renderBracket(matches, category, containerEl?)
+ * matches:     populated Match array
+ * category:    Category object (or just a name string for backward compat)
+ * containerEl: optional DOM element to render into (falls back to #bracket-container)
  */
-function renderBracket(matches, category) {
-  const container = document.getElementById('bracket-container');
+function renderBracket(matches, category, containerEl) {
+  const container = containerEl || document.getElementById('bracket-container');
+  if (!container) return;
   if (!matches || !matches.length) {
     container.innerHTML = '<p class="text-muted">Fikstür verisi yok.</p>';
     return;
@@ -310,8 +312,9 @@ function athleteTextSvg(athlete, isBye, winner, x, y, slotNumber) {
 
   // Draw position number circle (like "9." in the reference)
   if (slotNumber && !isBye && athlete) {
-    const circleX = x - 4;
-    const circleY = y - 8;
+    // Circle sits inside the match box, to the left of the athlete name text
+    const circleX = x + 5;
+    const circleY = y - 6;
     g.appendChild(svgEl('circle', { cx: circleX, cy: circleY, r: 9, fill: 'var(--bg-secondary)', stroke: 'var(--border)', 'stroke-width': 1 }));
     const numTxt = svgEl('text', {
       x: circleX, y: circleY + 4,
@@ -322,7 +325,7 @@ function athleteTextSvg(athlete, isBye, winner, x, y, slotNumber) {
     });
     numTxt.textContent = slotNumber;
     g.appendChild(numTxt);
-    x += 14; // indent text after the circle
+    x += 18; // indent text to the right of the circle
   }
 
   const text = svgEl('text', { x, y });
