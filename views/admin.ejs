@@ -94,6 +94,27 @@
           </select>
         </div>
 
+        <!-- Excel bulk import -->
+        <div class="import-section" id="import-section">
+          <details class="import-details">
+            <summary class="import-summary">📥 Excel'den Toplu Aktar (.xlsx)</summary>
+            <div class="import-body">
+              <p class="import-hint">
+                Sütun sırası: <b>A: Ad</b>, <b>B: Soyad</b>, <b>C: Ülke</b>, <b>D: Kulüp</b>, <b>E: Seri Başı (1-4, opsiyonel)</b><br/>
+                İlk satır başlık olarak atlanır.
+              </p>
+              <div class="form-row flex-wrap" style="gap:8px;align-items:center;">
+                <select id="import-category" class="form-input">
+                  <option value="">Siklet seç</option>
+                </select>
+                <input type="file" id="import-file" accept=".xlsx,.xls" class="form-input" style="max-width:260px;" />
+                <button id="import-btn" class="btn btn-secondary" type="button">📥 İçe Aktar</button>
+              </div>
+              <div id="import-result" class="import-result hidden"></div>
+            </div>
+          </details>
+        </div>
+
         <div id="athletes-list" class="list-container">
           <p class="loading-text">Yükleniyor...</p>
         </div>

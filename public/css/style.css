@@ -1150,3 +1150,47 @@ select.form-input option {
   transform-origin: center;
 }
 
+
+/* ===========================
+   Excel Import Section
+   =========================== */
+.import-section {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.import-details summary.import-summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding: 4px 0;
+  list-style: none;
+  user-select: none;
+}
+
+.import-details summary.import-summary::-webkit-details-marker { display: none; }
+
+.import-details[open] summary.import-summary {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.import-body {
+  padding: 10px 0 4px;
+}
+
+.import-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted, var(--text-secondary));
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.import-result {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.import-result.hidden { display: none; }

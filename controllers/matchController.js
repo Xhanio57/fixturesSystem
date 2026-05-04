@@ -27,9 +27,41 @@ function shuffle(arr) {
   return arr;
 }
 
-/** Pool label for a slot index given bracketSize.
- *  Pool A: first quarter, B: second, C: third, D: fourth.
- *  Returns null for small brackets where pools don't apply. */
+/* ─────────────────────────────────────────────────────────────
+   NUMBER-TO-BOX MAP (IJF / Judo standard bracket draw order)
+   Returns an array of length `bracketSize` where:
+     map[visualIndex] = drawPosition (1-indexed)
+   Example for 16 slots:
+     [1, 9, 5, 13, 3, 11, 7, 15, 2, 10, 6, 14, 4, 12, 8, 16]
+   Seeds 1-4 are always at visual indices [0, n/2, n/4, 3n/4]:
+     Seed 1 → draw pos 1  → visual index 0      (Pool A top)
+     Seed 2 → draw pos 2  → visual index n/2     (Pool C top)
+     Seed 3 → draw pos 3  → visual index n/4     (Pool B top)
+     Seed 4 → draw pos 4  → visual index 3n/4    (Pool D top)
+   Generation algorithm (recursive):
+     map(2)    = [1, 2]
+     map(n)[2i]   = sub[i]
+     map(n)[2i+1] = sub[i] + n/2
+───────────────────────────────────────────────────────────── */
+function generateNumberToBoxMap(bracketSize) {
+  if (bracketSize <= 1) return [1];
+  if (bracketSize === 2) return [1, 2];
+  const half = bracketSize / 2;
+  const sub = generateNumberToBoxMap(half);
+  const map = new Array(bracketSize);
+  for (let i = 0; i < half; i++) {
+    map[i * 2] = sub[i];           // top of each R1 pair
+    map[i * 2 + 1] = sub[i] + half; // bottom of each R1 pair (complement)
+  }
+  return map;
+}
+
+/** Given a map, returns the visual index for a given draw position (1-indexed) */
+function visualIndexForDrawPos(map, drawPos) {
+  return map.indexOf(drawPos);
+}
+
+
 function poolForSlot(slotIndex, bracketSize) {
   if (bracketSize < 8) return null;
   const q = Math.floor(bracketSize / 4);
@@ -41,22 +73,21 @@ function poolForSlot(slotIndex, bracketSize) {
 
 /* ─────────────────────────────────────────────────────────────
    SMART SWAP BRACKET BUILDER
-   Seeds placed at canonical IJF positions:
-     Seed 1 → slot 0          (Pool A top   = "A1")
-     Seed 2 → slot last       (Pool D bottom = "D16")
-     Seed 3 → slot half       (Pool C top   = "C9")
-     Seed 4 → slot half-1     (Pool B bottom = "B8")
-   BYE distribution: spread BYEs evenly across pools.
-     Adjacent slots of seeded athletes get BYEs first.
-     Remaining BYEs balanced: floor(total/4) per pool.
-   Club-clash prevention: after initial placement, scan each pool
-   for two athletes from the same club and swap one of them with
-   an athlete in a different pool (skipping seeded athletes).
+   Seeds placed at IJF canonical positions derived from numberToBoxMap:
+     Seed 1 → draw pos 1 → visual index 0       (Pool A top)
+     Seed 2 → draw pos 2 → visual index n/2      (Pool C top)
+     Seed 3 → draw pos 3 → visual index n/4      (Pool B top)
+     Seed 4 → draw pos 4 → visual index 3n/4     (Pool D top)
+   BYE distribution: seeds get BYEs adjacent first; remainder
+     spread evenly floor(total/4) per pool.
+   Clash prevention: scan each pool for two athletes from the same
+     club OR country and swap one with a different pool.
 ───────────────────────────────────────────────────────────── */
 function buildBracketWithSmartSwap(athletes, bracketSize) {
   const n = athletes.length;
   const totalBYEs = bracketSize - n;
   const poolSize = Math.max(bracketSize / 4, 1);
+  const boxMap = generateNumberToBoxMap(bracketSize);
 
   // Sort seeded athletes by seedIndex (1 first)
   const seeded = athletes
@@ -67,27 +98,27 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
 
   const slots = new Array(bracketSize).fill(null); // null = BYE
 
-  // Fixed canonical seed positions
-  const seedPositions = [
-    0,                                // Seed 1: A1
-    bracketSize - 1,                  // Seed 2: D last
-    Math.floor(bracketSize / 2),      // Seed 3: C first
-    Math.floor(bracketSize / 2) - 1,  // Seed 4: B last
-  ];
+  // IJF canonical seed positions: seeds 1-4 go to draw positions 1, 2, 3, 4
+  // which map to visual indices derived from the numberToBoxMap
+  const seedDrawPositions = [1, 2, 3, 4];
+  const seedVisualIndices = seedDrawPositions.map((dp) => visualIndexForDrawPos(boxMap, dp));
 
   seeded.forEach((ath, i) => {
-    if (i < seedPositions.length) slots[seedPositions[i]] = ath;
+    if (i < seedVisualIndices.length) slots[seedVisualIndices[i]] = ath;
   });
 
   // ── Balanced BYE distribution ──
   // Phase 1: seed adjacent slots get BYEs first (seeded athletes get a bye in R1)
-  const adjacentOfSeed = [1, bracketSize - 2, Math.floor(bracketSize / 2) + 1, Math.floor(bracketSize / 2) - 2];
+  const adjacentOfSeed = seedVisualIndices.map((vi) => {
+    // The adjacent slot is the paired slot in the same R1 match
+    // If vi is even → vi+1; if vi is odd → vi-1
+    return vi % 2 === 0 ? vi + 1 : vi - 1;
+  });
   const byeSet = new Set();
   let byesUsed = 0;
   for (let i = 0; i < Math.min(seeded.length, adjacentOfSeed.length) && byesUsed < totalBYEs; i++) {
     const adj = adjacentOfSeed[i];
-    // Only assign as BYE if the adjacent slot is not occupied by another seed
-    if (!byeSet.has(adj) && slots[adj] === null) {
+    if (adj >= 0 && adj < bracketSize && !byeSet.has(adj) && slots[adj] === null) {
       byeSet.add(adj);
       byesUsed++;
     }
@@ -102,12 +133,10 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
     for (let poolIdx = 0; poolIdx < 4; poolIdx++) {
       const start = poolIdx * poolSize;
       const end = start + poolSize;
-      // Free slots in this pool (not seeds, not already-bye)
       const poolFree = [];
       for (let i = start; i < end; i++) {
         if (slots[i] === null && !byeSet.has(i)) poolFree.push(i);
       }
-      // Mark the last N as BYEs (bottom of each pool)
       const poolBYECount = Math.min(byesPerPool[poolIdx], poolFree.length);
       for (let i = poolFree.length - poolBYECount; i < poolFree.length; i++) {
         byeSet.add(poolFree[i]);
@@ -117,19 +146,18 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
   }
 
   // ── Fill non-BYE slots with remaining athletes ──
-  const remaining = [...seeded.slice(Math.min(seeded.length, seedPositions.length)), ...nonSeeded];
+  const remaining = [...seeded.slice(Math.min(seeded.length, seedVisualIndices.length)), ...nonSeeded];
   let ri = 0;
   for (let i = 0; i < bracketSize; i++) {
     if (slots[i] === null && !byeSet.has(i)) {
       if (ri < remaining.length) slots[i] = remaining[ri++];
     }
   }
-  // Any athletes still unplaced (shouldn't happen, but safety)
   for (let i = 0; i < bracketSize && ri < remaining.length; i++) {
     if (slots[i] === null && !byeSet.has(i)) slots[i] = remaining[ri++];
   }
 
-  // ── Smart Swap: resolve club conflicts within each pool ──
+  // ── Smart Swap: resolve club AND country conflicts within each pool ──
   if (bracketSize >= 8) {
     const qSize = bracketSize / 4;
     for (let poolIdx = 0; poolIdx < 4; poolIdx++) {
@@ -137,27 +165,28 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
       const end = start + qSize;
 
       for (let i = start; i < end; i++) {
-        if (!slots[i] || !slots[i].club) continue;
+        if (!slots[i]) continue;
         for (let j = i + 1; j < end; j++) {
-          if (!slots[j] || !slots[j].club) continue;
-          if (slots[i].club !== slots[j].club) continue;
+          if (!slots[j]) continue;
+          // Conflict: same club or same country (if both non-empty)
+          const sameClub = slots[i].club && slots[j].club && slots[i].club === slots[j].club;
+          const sameCountry = slots[i].country && slots[j].country && slots[i].country === slots[j].country;
+          if (!sameClub && !sameCountry) continue;
 
-          // Conflict: try to swap slots[j] with an athlete in a different pool
           let swapped = false;
           for (let k = 0; k < bracketSize && !swapped; k++) {
-            // Must be in a different pool
             if (k >= start && k < end) continue;
             if (!slots[k]) continue;
-            // Don't move seeded athletes from canonical positions
             if (slots[k].seedIndex) continue;
 
-            // Would swapping introduce a new conflict at position k?
             const kPoolStart = Math.floor(k / qSize) * qSize;
             const kPoolEnd = kPoolStart + qSize;
             let newConflict = false;
             for (let m = kPoolStart; m < kPoolEnd && !newConflict; m++) {
-              if (m === k || !slots[m] || !slots[m].club) continue;
-              if (slots[m].club === slots[j].club) newConflict = true;
+              if (m === k || !slots[m]) continue;
+              const kSameClub = slots[m].club && slots[j].club && slots[m].club === slots[j].club;
+              const kSameCountry = slots[m].country && slots[j].country && slots[m].country === slots[j].country;
+              if (kSameClub || kSameCountry) newConflict = true;
             }
             if (!newConflict) {
               [slots[j], slots[k]] = [slots[k], slots[j]];
@@ -169,7 +198,7 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
     }
   }
 
-  return slots;
+  return { slots, boxMap };
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -183,7 +212,7 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
      Repechage:    QF losers → RepAB + RepCD matches
      Bronze:       SF1 loser vs RepAB winner; SF2 loser vs RepCD winner
 ───────────────────────────────────────────────────────────── */
-function generateAllMatches(slots, bracketSize, category) {
+function generateAllMatches(slots, bracketSize, category, boxMap) {
   const categoryId = category._id;
   const isDoubleRep = category.bracketType === 'DoubleRepechage' && bracketSize >= 8;
   const totalRounds = Math.log2(bracketSize);
@@ -221,6 +250,9 @@ function generateAllMatches(slots, bracketSize, category) {
       athleteB: slots[i + 1] ? slots[i + 1]._id : null,
       isByeA: slots[i] === null,
       isByeB: slots[i + 1] === null,
+      // Draw position numbers for display (from the IJF numberToBoxMap)
+      slotNumberA: boxMap ? (boxMap[i] || null) : null,
+      slotNumberB: boxMap ? (boxMap[i + 1] || null) : null,
     });
     // Auto-advance BYE
     if (m.isByeA && m.athleteB) m.winner = m.athleteB;
@@ -325,8 +357,8 @@ exports.runDraw = async (req, res) => {
     }
 
     const bracketSize = nextPowerOf2(athletes.length);
-    const slots = buildBracketWithSmartSwap(athletes, bracketSize);
-    const matchDocs = generateAllMatches(slots, bracketSize, category);
+    const { slots, boxMap } = buildBracketWithSmartSwap(athletes, bracketSize);
+    const matchDocs = generateAllMatches(slots, bracketSize, category, boxMap);
 
     // Clear existing matches
     await Match.deleteMany({ categoryId: category._id });

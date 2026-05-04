@@ -1,6 +1,7 @@
 const Athlete = require('../models/Athlete');
 const Category = require('../models/Category');
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 
 function isValidObjectId(id) {
   return mongoose.Types.ObjectId.isValid(id);
@@ -159,6 +160,91 @@ exports.deleteAthlete = async (req, res) => {
     }
     await Athlete.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: 'Sporcu silindi' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// POST /api/athletes/import — bulk import from uploaded .xlsx file
+// Expected Excel columns (row 1 = header, ignored):
+//   A: firstName, B: lastName, C: country, D: club, E: seedIndex
+// Query param: categoryId (required)
+exports.importAthletes = async (req, res) => {
+  try {
+    const { categoryId } = req.query;
+    if (!categoryId || !isValidObjectId(categoryId)) {
+      return res.status(400).json({ success: false, message: 'Geçersiz veya eksik kategori ID' });
+    }
+    const category = await Category.findById(categoryId);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
+    }
+    if (category.drawStatus === 'Completed') {
+      return res.status(400).json({ success: false, message: 'Bu kategoride kura tamamlanmış.' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Excel dosyası yüklenmedi.' });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      return res.status(400).json({ success: false, message: 'Excel dosyasında sayfa bulunamadı.' });
+    }
+
+    const toInsert = [];
+    const errors = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // skip header row
+
+      const raw = (col) => {
+        const cell = row.getCell(col);
+        return cell.value !== null && cell.value !== undefined ? String(cell.value).trim() : '';
+      };
+
+      const firstName = raw(1);
+      const lastName = raw(2);
+      if (!firstName || !lastName) {
+        errors.push(`Satır ${rowNumber}: Ad veya Soyad eksik, atlandı.`);
+        return;
+      }
+
+      let parsedSeedIndex = null;
+      const seedRaw = raw(5);
+      if (seedRaw) {
+        const n = Number(seedRaw);
+        if (!Number.isNaN(n) && n >= 1 && n <= 4) parsedSeedIndex = n;
+      }
+
+      toInsert.push({
+        firstName,
+        lastName,
+        country: raw(3) ? raw(3).toUpperCase().slice(0, 10) : '',
+        club: raw(4) || '',
+        category: category._id,
+        seedIndex: parsedSeedIndex,
+        isSeeded: parsedSeedIndex !== null,
+      });
+    });
+
+    if (!toInsert.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'İçe aktarılacak geçerli sporcu bulunamadı.',
+        errors,
+      });
+    }
+
+    const inserted = await Athlete.insertMany(toInsert, { ordered: false });
+    res.status(201).json({
+      success: true,
+      message: `${inserted.length} sporcu başarıyla içe aktarıldı.`,
+      data: inserted,
+      errors: errors.length ? errors : undefined,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

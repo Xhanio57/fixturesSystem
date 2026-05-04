@@ -178,8 +178,25 @@ function buildMainBracketSvg(matches) {
       g.appendChild(badgeTxt);
     }
 
-    g.appendChild(athleteTextSvg(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 6));
-    g.appendChild(athleteTextSvg(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 6));
+    g.appendChild(athleteTextSvg(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 6, match.slotNumberA));
+    g.appendChild(athleteTextSvg(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 6, match.slotNumberB));
+
+    // Match ID circle (bottom-right corner of each match box, like the reference image)
+    if (match.matchID && match.roundNumber === 1) {
+      const cx = x + w + 10;
+      const cy = y + h / 2;
+      g.appendChild(svgEl('circle', { cx, cy, r: 11, fill: 'var(--bg-secondary)', stroke: 'var(--accent)', 'stroke-width': 1.5 }));
+      const numTxt = svgEl('text', {
+        x: cx, y: cy + 4,
+        'text-anchor': 'middle',
+        'font-size': 9,
+        fill: 'var(--accent)',
+        'font-weight': '700',
+      });
+      numTxt.textContent = match.matchID;
+      g.appendChild(numTxt);
+    }
+
     svg.appendChild(g);
   });
 
@@ -266,8 +283,19 @@ function buildRepechageSvg(repMatches) {
     labelTxt.textContent = poolLabels[pool] || pool;
     g.appendChild(labelTxt);
 
-    g.appendChild(athleteTextSvg(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 6));
-    g.appendChild(athleteTextSvg(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 6));
+    g.appendChild(athleteTextSvg(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 6, null));
+    g.appendChild(athleteTextSvg(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 6, null));
+
+    // Match ID circle
+    if (match.matchID) {
+      const cx = x + w - 12;
+      const cy = y + h - 12;
+      g.appendChild(svgEl('circle', { cx, cy, r: 10, fill: 'var(--bg-elevated)', stroke: '#8b5cf6', 'stroke-width': 1.5 }));
+      const numTxt = svgEl('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', 'font-size': 9, fill: '#8b5cf6', 'font-weight': '700' });
+      numTxt.textContent = match.matchID;
+      g.appendChild(numTxt);
+    }
+
     svg.appendChild(g);
   });
 
@@ -277,7 +305,26 @@ function buildRepechageSvg(repMatches) {
 /* ─────────────────────────────────────────────
    SHARED HELPERS
 ───────────────────────────────────────────── */
-function athleteTextSvg(athlete, isBye, winner, x, y) {
+function athleteTextSvg(athlete, isBye, winner, x, y, slotNumber) {
+  const g = svgEl('g');
+
+  // Draw position number circle (like "9." in the reference)
+  if (slotNumber && !isBye && athlete) {
+    const circleX = x - 4;
+    const circleY = y - 8;
+    g.appendChild(svgEl('circle', { cx: circleX, cy: circleY, r: 9, fill: 'var(--bg-secondary)', stroke: 'var(--border)', 'stroke-width': 1 }));
+    const numTxt = svgEl('text', {
+      x: circleX, y: circleY + 4,
+      'text-anchor': 'middle',
+      'font-size': 8,
+      fill: 'var(--text-secondary)',
+      'font-weight': '600',
+    });
+    numTxt.textContent = slotNumber;
+    g.appendChild(numTxt);
+    x += 14; // indent text after the circle
+  }
+
   const text = svgEl('text', { x, y });
 
   let label = '—';
@@ -299,8 +346,9 @@ function athleteTextSvg(athlete, isBye, winner, x, y) {
   }
 
   text.setAttribute('class', cls);
-  text.textContent = truncateBracket(label, 28);
-  return text;
+  text.textContent = truncateBracket(label, slotNumber ? 24 : 28);
+  g.appendChild(text);
+  return g;
 }
 
 function roundLabel(roundNumber, totalRounds) {

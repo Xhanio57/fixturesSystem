@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('edit-save-btn').addEventListener('click', handleEditSave);
   document.getElementById('edit-cancel-btn').addEventListener('click', closeModal);
+  document.getElementById('import-btn').addEventListener('click', handleImportAthletes);
 });
 
 // ─── API Helpers ─────────────────────────────
@@ -75,7 +76,7 @@ function renderCategories() {
 }
 
 function populateCategorySelects() {
-  const selects = ['ath-category', 'filter-category', 'edit-category'];
+  const selects = ['ath-category', 'filter-category', 'edit-category', 'import-category'];
   selects.forEach((id) => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -271,6 +272,67 @@ function showToast(message, type = 'info') {
   toast.className = `toast ${type}`;
   clearTimeout(toast._timeout);
   toast._timeout = setTimeout(() => toast.classList.add('hidden'), 4000);
+}
+
+// ─── Excel Import ─────────────────────────────
+async function handleImportAthletes() {
+  const categoryId = document.getElementById('import-category').value;
+  const fileInput = document.getElementById('import-file');
+  const resultEl = document.getElementById('import-result');
+
+  resultEl.className = 'import-result hidden';
+  resultEl.textContent = '';
+
+  if (!categoryId) {
+    showToast('Lütfen içe aktarılacak sikleti seçin.', 'error');
+    return;
+  }
+  if (!fileInput.files || !fileInput.files[0]) {
+    showToast('Lütfen bir Excel dosyası seçin.', 'error');
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const btn = document.getElementById('import-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Aktarılıyor...';
+
+  try {
+    const res = await fetch(`/api/athletes/import?categoryId=${encodeURIComponent(categoryId)}`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+
+    let html = '';
+    if (data.success) {
+      html = `<span class="text-green-400">✅ ${escHtml(data.message)}</span>`;
+    } else {
+      html = `<span class="text-red-400">❌ ${escHtml(data.message)}</span>`;
+    }
+    if (data.errors && data.errors.length) {
+      html += '<ul class="mt-1 text-yellow-400 text-xs">' +
+        data.errors.map((e) => `<li>${escHtml(e)}</li>`).join('') + '</ul>';
+    }
+    resultEl.innerHTML = html;
+    resultEl.className = 'import-result';
+    fileInput.value = '';
+
+    if (data.success) {
+      showToast(data.message, 'success');
+      await loadAthletes();
+    }
+  } catch (err) {
+    resultEl.innerHTML = `<span class="text-red-400">❌ ${escHtml(err.message)}</span>`;
+    resultEl.className = 'import-result';
+    showToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📥 İçe Aktar';
+  }
 }
 
 // ─── Utility ─────────────────────────────────

@@ -60,6 +60,16 @@ const MatchSchema = new mongoose.Schema(
       enum: ['A', 'B', null],
       default: null,
     },
+    // IJF draw-position numbers for R1 matches (numberToBoxMap value for visual slot)
+    // e.g. slotNumberA=9 means athlete A is draw position 9 (displayed as "9. Pampe")
+    slotNumberA: {
+      type: Number,
+      default: null,
+    },
+    slotNumberB: {
+      type: Number,
+      default: null,
+    },
   },
   { timestamps: true }
 );
