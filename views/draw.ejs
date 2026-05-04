@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canlı Kura Çekimi</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <!-- GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.4/gsap.min.js"></script>
+</head>
+<body class="draw-page">
+
+  <header class="site-header">
+    <div class="header-inner">
+      <h1 class="site-title">🏆 Canlı Kura Çekimi</h1>
+      <nav class="header-nav">
+        <a href="/" class="nav-link">Admin Paneli</a>
+        <a href="/kura" class="nav-link active">Canlı Kura</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="draw-layout">
+
+    <!-- LEFT: Category menu -->
+    <aside class="draw-sidebar">
+      <h3 class="sidebar-title">Sikletler</h3>
+      <ul class="category-menu" id="category-menu">
+        <% categories.forEach(cat => { %>
+          <li class="category-menu-item <%= cat.isDrawCompleted ? 'completed' : '' %>"
+              data-id="<%= cat._id %>"
+              data-slug="<%= encodeURIComponent(cat.name) %>">
+            <span class="cat-name"><%= cat.name %></span>
+            <% if (cat.gender) { %>
+              <span class="cat-meta"><%= cat.gender %></span>
+            <% } %>
+            <% if (cat.isDrawCompleted) { %>
+              <span class="badge-done">✓ Çekildi</span>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+    </aside>
+
+    <!-- MAIN: Draw area -->
+    <main class="draw-main">
+
+      <!-- No category selected -->
+      <div id="placeholder-view" class="placeholder-view">
+        <div class="placeholder-icon">🎲</div>
+        <p>Soldan bir siklet seçin.</p>
+      </div>
+
+      <!-- Draw content (hidden until category selected) -->
+      <div id="draw-content" class="hidden">
+
+        <!-- Category header -->
+        <div class="draw-header">
+          <h2 id="draw-cat-title" class="draw-cat-title"></h2>
+          <div class="draw-header-meta" id="draw-cat-meta"></div>
+        </div>
+
+        <!-- Athlete list & slot machine -->
+        <div class="draw-arena">
+
+          <div class="athletes-panel">
+            <h3 class="panel-subtitle">Sporcular</h3>
+            <ul id="draw-athletes-list" class="draw-athletes-list"></ul>
+          </div>
+
+          <!-- Slot machine animation -->
+          <div class="slot-machine-wrapper" id="slot-wrapper">
+            <div class="slot-machine">
+              <div class="slot-reel-container">
+                <div class="slot-reel" id="slot-reel"></div>
+              </div>
+              <div class="slot-label">Eşleşme Çekiliyor...</div>
+            </div>
+            <button id="draw-btn" class="btn btn-draw">
+              🎯 Kura Başlat
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Bracket / fixture tree -->
+        <div class="bracket-section" id="bracket-section">
+          <h3 class="panel-subtitle bracket-subtitle">Fikstür Ağacı</h3>
+          <div id="bracket-container" class="bracket-container"></div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/js/draw.js"></script>
+  <script src="/js/bracket.js"></script>
+</body>
+</html>

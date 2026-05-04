@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Turnuva Yönetim Paneli</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="admin-page">
+
+  <header class="site-header">
+    <div class="header-inner">
+      <h1 class="site-title">🏆 Turnuva Yönetim Sistemi</h1>
+      <nav class="header-nav">
+        <a href="/" class="nav-link active">Admin Paneli</a>
+        <a href="/kura" class="nav-link">Canlı Kura</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div class="panel-grid">
+
+      <!-- LEFT: Categories -->
+      <section class="panel-section" id="categories-section">
+        <h2 class="section-title">Sikletler</h2>
+
+        <form id="category-form" class="form-card">
+          <div class="form-row">
+            <input type="text" id="cat-name" placeholder="-60kg" required class="form-input" />
+            <select id="cat-gender" class="form-input">
+              <option value="Erkek">Erkek</option>
+              <option value="Kadın">Kadın</option>
+              <option value="Karma">Karma</option>
+            </select>
+            <input type="text" id="cat-ageGroup" placeholder="U18, Senior..." class="form-input" />
+            <button type="submit" class="btn btn-primary">+ Ekle</button>
+          </div>
+        </form>
+
+        <div id="categories-list" class="list-container">
+          <p class="loading-text">Yükleniyor...</p>
+        </div>
+      </section>
+
+      <!-- RIGHT: Athletes -->
+      <section class="panel-section" id="athletes-section">
+        <h2 class="section-title">Sporcular</h2>
+
+        <form id="athlete-form" class="form-card">
+          <div class="form-row flex-wrap">
+            <input type="text" id="ath-firstName" placeholder="Ad" required class="form-input" />
+            <input type="text" id="ath-lastName" placeholder="Soyad" required class="form-input" />
+            <input type="text" id="ath-club" placeholder="Kulüp" class="form-input" />
+            <select id="ath-category" class="form-input" required>
+              <option value="">Siklet seç</option>
+            </select>
+            <label class="checkbox-label">
+              <input type="checkbox" id="ath-seeded" />
+              Seribaşı
+            </label>
+            <button type="submit" class="btn btn-primary">+ Ekle</button>
+          </div>
+        </form>
+
+        <div class="filter-row">
+          <label>Filtrele:</label>
+          <select id="filter-category" class="form-input form-input--sm">
+            <option value="">Tüm Sikletler</option>
+          </select>
+        </div>
+
+        <div id="athletes-list" class="list-container">
+          <p class="loading-text">Yükleniyor...</p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Edit Athlete Modal -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Sporcu Düzenle</h3>
+      <input type="hidden" id="edit-id" />
+      <div class="form-group">
+        <label>Ad</label>
+        <input type="text" id="edit-firstName" class="form-input" />
+      </div>
+      <div class="form-group">
+        <label>Soyad</label>
+        <input type="text" id="edit-lastName" class="form-input" />
+      </div>
+      <div class="form-group">
+        <label>Kulüp</label>
+        <input type="text" id="edit-club" class="form-input" />
+      </div>
+      <div class="form-group">
+        <label>Siklet</label>
+        <select id="edit-category" class="form-input"></select>
+      </div>
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="edit-seeded" /> Seribaşı
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button id="edit-save-btn" class="btn btn-primary">Kaydet</button>
+        <button id="edit-cancel-btn" class="btn btn-secondary">İptal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
