@@ -365,7 +365,11 @@ exports.setWinner = async (req, res) => {
       await Athlete.countDocuments({ category: match.categoryId })
     )) : 0;
     if (match.roundNumber === totalRounds) {
-      await Athlete.findByIdAndUpdate(winnerId, { isWinner: true });
+      // winnerId is already validated as a valid ObjectId above; cast explicitly to ObjectId
+      await Athlete.findByIdAndUpdate(
+        new mongoose.Types.ObjectId(String(winnerId)),
+        { isWinner: true }
+      );
     }
 
     const populated = await Match.findById(match._id)
