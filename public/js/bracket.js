@@ -30,7 +30,7 @@ function renderBracket(matches, category) {
 
   if (isDoubleRep && repMatches.length) {
     // Render repechage section below main bracket
-    const repSvg = buildRepechagelSvg(repMatches);
+    const repSvg = buildRepechageSvg(repMatches);
     container.innerHTML = '';
     container.appendChild(mainSvg);
 
@@ -189,7 +189,7 @@ function buildMainBracketSvg(matches) {
 /* ─────────────────────────────────────────────
    REPECHAGE + BRONZE SVG
 ───────────────────────────────────────────── */
-function buildRepechagelSvg(repMatches) {
+function buildRepechageSvg(repMatches) {
   const MATCH_W = 210;
   const MATCH_H = 82;
   const MATCH_GAP_V = 30;
