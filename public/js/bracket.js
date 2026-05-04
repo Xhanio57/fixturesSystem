@@ -311,6 +311,8 @@ function athleteTextSvg(athlete, isBye, winner, x, y, slotNumber) {
   const g = svgEl('g');
 
   // Draw position number circle (like "9." in the reference)
+  // NOTE: `x` here is already matchBoxX + 10 (passed by caller as `x + 10`),
+  // so circleX = x + 5 = matchBoxX + 15; left edge = matchBoxX + 6 — safely inside the box.
   if (slotNumber && !isBye && athlete) {
     // Circle sits inside the match box, to the left of the athlete name text
     const circleX = x + 5;
