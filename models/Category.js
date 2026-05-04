@@ -17,12 +17,31 @@ const CategorySchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    // Derived convenience flag kept for backward compat — always mirrors drawStatus
     isDrawCompleted: {
       type: Boolean,
       default: false,
     },
+    // 'Pending' | 'Completed'
+    drawStatus: {
+      type: String,
+      enum: ['Pending', 'Completed'],
+      default: 'Pending',
+    },
+    // 'SingleElimination' | 'DoubleRepechage'
+    bracketType: {
+      type: String,
+      enum: ['SingleElimination', 'DoubleRepechage'],
+      default: 'DoubleRepechage',
+    },
   },
   { timestamps: true }
 );
+
+// Keep isDrawCompleted in sync with drawStatus
+CategorySchema.pre('save', function (next) {
+  this.isDrawCompleted = this.drawStatus === 'Completed';
+  next();
+});
 
 module.exports = mongoose.model('Category', CategorySchema);

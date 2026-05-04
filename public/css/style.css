@@ -892,3 +892,168 @@ select.form-input option {
     font-size: 1.2rem;
   }
 }
+
+/* ===========================
+   Pool legend (Draw page)
+   =========================== */
+.pool-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.pool-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 0.8rem;
+  color: #fff;
+}
+
+.pool-A { background: #3b82f6; }
+.pool-B { background: #10b981; }
+.pool-C { background: #f59e0b; }
+.pool-D { background: #ef4444; }
+.pool-rep { background: #8b5cf6; font-size: 0.65rem; width: auto; padding: 0 8px; }
+.pool-bronze { background: #cd7f32; font-size: 0.65rem; width: auto; padding: 0 8px; }
+
+/* ===========================
+   Bracket SVG additions
+   =========================== */
+.bracket-text.winner {
+  fill: var(--accent);
+  font-weight: 700;
+}
+
+.bracket-match-rect--rep {
+  fill: var(--bg-elevated);
+  stroke: #8b5cf6;
+  stroke-width: 1.5;
+}
+
+.bracket-line--rep {
+  stroke: #8b5cf6;
+  stroke-dasharray: 5 3;
+  fill: none;
+}
+
+.bracket-pool-label {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font);
+  font-weight: 600;
+}
+
+.bracket-repechage-title {
+  margin: 24px 0 12px;
+  padding: 12px 20px;
+  background: var(--bg-elevated);
+  border-left: 4px solid #8b5cf6;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-weight: 700;
+  color: #a78bfa;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+}
+
+/* ===========================
+   Badge additions
+   =========================== */
+.badge-winner {
+  background: rgba(255, 215, 0, 0.15);
+  color: gold;
+  border: 1px solid rgba(255, 215, 0, 0.4);
+}
+
+.badge-rep {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+.badge-se {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+/* ===========================
+   Spectator / Presentation Mode
+   =========================== */
+.spectator-page {
+  background: var(--bg-primary);
+  min-height: 100vh;
+}
+
+.spectator-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-bottom: 2px solid var(--accent);
+  padding: 20px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.spectator-title {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: var(--accent);
+  text-shadow: 0 0 40px rgba(247, 201, 72, 0.4);
+  letter-spacing: 0.04em;
+}
+
+.spectator-body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  height: calc(100vh - 90px);
+  overflow: hidden;
+}
+
+.spectator-sidebar {
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 20px 0;
+}
+
+.spectator-main {
+  overflow-y: auto;
+  padding: 32px 40px;
+}
+
+.spectator-cat-title {
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--accent);
+  text-align: center;
+  margin-bottom: 8px;
+  text-shadow: 0 0 50px rgba(247, 201, 72, 0.5);
+}
+
+.spectator-cat-meta {
+  text-align: center;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 32px;
+}
+
+/* Clock in spectator */
+.spectator-clock {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 1800px) {
+  .spectator-title { font-size: 3rem; }
+  .spectator-cat-title { font-size: 4.5rem; }
+  .spectator-cat-meta { font-size: 1.5rem; }
+}
+

@@ -36,7 +36,10 @@ exports.getCategory = async (req, res) => {
 // POST create category
 exports.createCategory = async (req, res) => {
   try {
-    const category = await Category.create(req.body);
+    const allowed = ['name', 'gender', 'ageGroup', 'bracketType'];
+    const data = {};
+    allowed.forEach((f) => { if (req.body[f] !== undefined) data[f] = String(req.body[f]); });
+    const category = await Category.create(data);
     res.status(201).json({ success: true, data: category });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -58,6 +61,7 @@ exports.updateCategory = async (req, res) => {
     if (req.body.name !== undefined) updateData.name = String(req.body.name);
     if (req.body.gender !== undefined) updateData.gender = String(req.body.gender);
     if (req.body.ageGroup !== undefined) updateData.ageGroup = String(req.body.ageGroup);
+    if (req.body.bracketType !== undefined) updateData.bracketType = String(req.body.bracketType);
 
     const updated = await Category.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
@@ -105,7 +109,7 @@ exports.resetDraw = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
     }
     await Match.deleteMany({ categoryId: req.params.id });
-    await Category.findByIdAndUpdate(req.params.id, { isDrawCompleted: false });
+    await Category.findByIdAndUpdate(req.params.id, { isDrawCompleted: false, drawStatus: 'Pending' });
     res.json({ success: true, message: 'Kura sıfırlandı' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

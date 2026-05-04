@@ -8,7 +8,7 @@ router.get('/', async (req, res) => {
   try {
     const categories = await Category.find().sort({ name: 1 });
     const athletes = await Athlete.find()
-      .populate('category', 'name isDrawCompleted')
+      .populate('category', 'name drawStatus')
       .sort({ lastName: 1 });
     res.render('admin', { categories, athletes });
   } catch (err) {
@@ -31,6 +31,26 @@ router.get('/kura/:slug', async (req, res) => {
   try {
     const categories = await Category.find().sort({ name: 1 });
     res.render('draw', { categories });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Spectator / Presentation Mode
+router.get('/sunum', async (req, res) => {
+  try {
+    const categories = await Category.find().sort({ name: 1 });
+    res.render('spectator', { categories });
+  } catch (err) {
+    res.status(500).send(err.message);
+  }
+});
+
+// Spectator with category slug
+router.get('/sunum/:slug', async (req, res) => {
+  try {
+    const categories = await Category.find().sort({ name: 1 });
+    res.render('spectator', { categories });
   } catch (err) {
     res.status(500).send(err.message);
   }

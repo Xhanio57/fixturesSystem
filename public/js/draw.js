@@ -1,9 +1,10 @@
 /* ============================================
    Live Draw (Kura) JavaScript
-   GSAP Slot Machine Animation
+   GSAP Slot Machine Animation with expo.out easing,
+   Confetti burst, Pool labels, Double Repechage support
    ============================================ */
 
-// Slot machine dimensions — read dynamically from CSS custom properties to stay in sync
+// Slot machine dimensions — read dynamically from CSS custom properties
 function getSlotDimensions() {
   const style = getComputedStyle(document.documentElement);
   const parseSize = (v) => parseInt(v) || 56;
@@ -58,18 +59,15 @@ function activateCategoryBySlug(slug, pushState) {
 }
 
 async function activateCategory(id, slug, pushState) {
-  // Update active state in menu
   document.querySelectorAll('.category-menu-item').forEach((el) => el.classList.remove('active'));
   const activeItem = document.querySelector(`.category-menu-item[data-id="${id}"]`);
   if (activeItem) activeItem.classList.add('active');
 
-  // Push URL
   if (pushState) {
     const url = `/kura/${encodeURIComponent(slug)}`;
     history.pushState({ slug }, '', url);
   }
 
-  // Load data
   try {
     const [catData, athData, matchData] = await Promise.all([
       apiFetch(`/api/categories/${id}`),
@@ -104,12 +102,27 @@ function renderDrawContent() {
   document.getElementById('draw-cat-meta').textContent =
     `${currentCategory.gender}${currentCategory.ageGroup ? ' · ' + currentCategory.ageGroup : ''} · ${currentAthletes.length} sporcu`;
 
+  // Pool legend visibility
+  const isDoubleRep = currentCategory.bracketType === 'DoubleRepechage';
+  const poolLegend = document.getElementById('pool-legend');
+  const typeLabel = document.getElementById('bracket-type-label');
+  if (typeLabel) typeLabel.textContent = isDoubleRep ? 'Çift Repechage' : 'Tek Eleme';
+  poolLegend.classList.toggle('hidden', !isDoubleRep);
+
+  // Bracket type badge
+  const badge = document.getElementById('bracket-type-badge');
+  if (badge) {
+    badge.textContent = isDoubleRep ? '🔀 Çift Repechage' : '⚔️ Tek Eleme';
+    badge.className = `badge ${isDoubleRep ? 'badge-rep' : 'badge-se'} ml-2 text-xs`;
+  }
+
   // Athletes list
   renderAthletesList();
 
   // Draw button state
   const drawBtn = document.getElementById('draw-btn');
-  if (currentCategory.isDrawCompleted) {
+  const drawCompleted = currentCategory.drawStatus === 'Completed';
+  if (drawCompleted) {
     drawBtn.disabled = true;
     drawBtn.textContent = '✓ Kura Çekildi';
   } else {
@@ -120,13 +133,12 @@ function renderDrawContent() {
   // Bracket
   if (currentMatches.length > 0) {
     document.getElementById('bracket-section').classList.remove('hidden');
-    renderBracket(currentMatches, currentCategory.name);
+    renderBracket(currentMatches, currentCategory);
   } else {
     document.getElementById('bracket-section').classList.add('hidden');
     document.getElementById('bracket-container').innerHTML = '';
   }
 
-  // Reset slot reel
   resetSlotReel();
 }
 
@@ -136,13 +148,14 @@ function renderAthletesList() {
     list.innerHTML = '<li class="text-muted">Sporcu eklenmemiş</li>';
     return;
   }
+  const seedEmoji = ['', '🥇', '🥈', '🥉', '4️⃣'];
   list.innerHTML = currentAthletes
     .map(
       (ath) => `
     <li class="draw-athlete-item">
       <span class="ath-name">
         ${escHtml(ath.lastName)}, ${escHtml(ath.firstName)}
-        ${ath.isSeeded ? ' <span class="badge badge-seeded">★</span>' : ''}
+        ${ath.seedIndex ? ` <span class="badge badge-seeded">${seedEmoji[ath.seedIndex] || '★'}</span>` : ''}
       </span>
       <span class="ath-club">${escHtml(ath.club || '')}</span>
     </li>
@@ -156,18 +169,18 @@ function resetSlotReel() {
   const reel = document.getElementById('slot-reel');
   reel.style.transform = 'translateY(0)';
   reel.innerHTML = '<div class="slot-item">—</div>';
-  document.querySelector('.slot-label').textContent = 'Kura Başlamadı';
+  const label = document.getElementById('slot-label');
+  if (label) label.textContent = 'Kura Başlamadı';
 }
 
 function buildReelItems(names, winnerName) {
-  // Create a long list: shuffle names many times, add winner at end
   const shuffled = [];
-  const repeatCount = 5;
+  const repeatCount = 6;
   for (let r = 0; r < repeatCount; r++) {
     const arr = [...names].sort(() => Math.random() - 0.5);
     shuffled.push(...arr);
   }
-  shuffled.push(winnerName); // Winner is the last visible item
+  shuffled.push(winnerName);
   return shuffled;
 }
 
@@ -185,22 +198,25 @@ async function runDraw() {
   try {
     const data = await apiFetch(`/api/matches/draw/${currentCategory._id}`, { method: 'POST' });
     currentMatches = data.data;
+    currentCategory.drawStatus = 'Completed';
     currentCategory.isDrawCompleted = true;
 
-    // Update menu item
     const menuItem = document.querySelector(`.category-menu-item[data-id="${currentCategory._id}"]`);
     if (menuItem) menuItem.classList.add('completed');
 
-    // Run slot machine animation for each pair
-    await runSlotAnimation();
+    // Only animate R1 main-bracket matches
+    const r1Matches = currentMatches.filter((m) => m.roundNumber === 1 &&
+      !['RepAB','RepCD','Bronze1','Bronze2'].includes(m.pool));
+
+    await runSlotAnimation(r1Matches);
 
     drawBtn.textContent = '✓ Kura Çekildi';
     drawBtn.disabled = true;
 
-    // Show bracket
+    // Show full bracket
     document.getElementById('bracket-section').classList.remove('hidden');
-    renderBracket(currentMatches, currentCategory.name);
-    showToast('Kura başarıyla tamamlandı!', 'success');
+    renderBracket(currentMatches, currentCategory);
+    showToast('Kura başarıyla tamamlandı! 🎉', 'success');
   } catch (err) {
     showToast(err.message, 'error');
     drawBtn.disabled = false;
@@ -208,14 +224,15 @@ async function runDraw() {
   }
 }
 
-async function runSlotAnimation() {
-  if (!currentMatches.length) return;
+async function runSlotAnimation(r1Matches) {
+  if (!r1Matches.length) return;
 
   const reel = document.getElementById('slot-reel');
-  const label = document.querySelector('.slot-label');
+  const label = document.getElementById('slot-label');
 
-  for (let i = 0; i < currentMatches.length; i++) {
-    const match = currentMatches[i];
+  for (let i = 0; i < r1Matches.length; i++) {
+    const match = r1Matches[i];
+    const poolLabel = match.pool ? ` [Pool ${match.pool}]` : '';
     const aName = match.athleteA
       ? `${match.athleteA.lastName}, ${match.athleteA.firstName}`
       : 'BYE';
@@ -223,29 +240,31 @@ async function runSlotAnimation() {
       ? `${match.athleteB.lastName}, ${match.athleteB.firstName}`
       : 'BYE';
 
-    label.textContent = `Maç ${i + 1}: Eşleşme çekiliyor...`;
+    if (label) label.textContent = `Maç ${i + 1}${poolLabel}: Eşleşme çekiliyor...`;
 
-    // Animate Athlete A
-    await animateSlot(reel, currentAthletes, aName, label, `Maç ${i + 1} — Oyuncu A`);
+    await animateSlot(reel, currentAthletes, aName, label, `Maç ${i + 1}${poolLabel} — A`);
     await sleep(600);
 
-    // Animate Athlete B
-    await animateSlot(reel, currentAthletes, bName, label, `Maç ${i + 1} — Oyuncu B`);
+    await animateSlot(reel, currentAthletes, bName, label, `Maç ${i + 1}${poolLabel} — B`);
     await sleep(900);
   }
 
-  label.textContent = '✓ Kura Tamamlandı';
+  if (label) label.textContent = '✓ Kura Tamamlandı';
 }
 
+/**
+ * Animates the slot machine reel to land on winnerName.
+ * Uses expo.out easing for a professional deceleration effect.
+ */
 function animateSlot(reel, athletes, winnerName, label, labelText) {
   return new Promise((resolve) => {
     const names = athletes.map((a) => `${a.lastName}, ${a.firstName}`);
+    if (!names.length) names.push(winnerName);
     if (!names.includes(winnerName)) names.push(winnerName);
 
     const items = buildReelItems(names, winnerName);
     const { itemHeight, containerHeight } = getSlotDimensions();
 
-    // Build DOM
     reel.innerHTML = items
       .map(
         (name, idx) =>
@@ -257,26 +276,78 @@ function animateSlot(reel, athletes, winnerName, label, labelText) {
     const centerOffset = Math.floor((containerHeight - itemHeight) / 2);
     const finalY = -(totalHeight - itemHeight - centerOffset);
 
-    // GSAP tween: start fast, ease to a stop
+    // expo.out: starts very fast, decelerates sharply — creates dramatic slot-machine feel
     gsap.fromTo(
       reel,
       { y: 0 },
       {
         y: finalY,
-        duration: 3.2,
-        ease: 'power4.out',
+        duration: 3.5,
+        ease: 'expo.out',
         onComplete: () => {
-          // Flash the winner item
           const winnerEl = reel.querySelector('.slot-item.highlight');
           if (winnerEl) {
             winnerEl.classList.add('winner-flash');
-            label.textContent = `${labelText}: ${winnerName}`;
+            // Pulse animation via GSAP
+            gsap.fromTo(
+              winnerEl,
+              { scale: 1 },
+              { scale: 1.08, repeat: 3, yoyo: true, duration: 0.18, ease: 'power2.inOut',
+                onComplete: () => { winnerEl.style.transform = 'scale(1)'; }
+              }
+            );
           }
+          if (label) label.textContent = `✅ ${labelText}: ${winnerName}`;
+          fireConfetti();
           resolve();
         },
       }
     );
   });
+}
+
+// ─── Confetti Burst ──────────────────────────
+function fireConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = Array.from({ length: 80 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height * 0.4,
+    r: Math.random() * 6 + 3,
+    d: Math.random() * 80,
+    color: `hsl(${Math.floor(Math.random() * 360)}, 90%, 60%)`,
+    tilt: Math.random() * 10 - 10,
+    tiltAngleInc: Math.random() * 0.07 + 0.05,
+    tiltAngle: 0,
+    vy: Math.random() * 3 + 2,
+  }));
+
+  let frame = 0;
+  const maxFrames = 120;
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach((p) => {
+      ctx.beginPath();
+      ctx.lineWidth = p.r;
+      ctx.strokeStyle = p.color;
+      ctx.moveTo(p.x + p.tilt + p.r / 3, p.y);
+      ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 5);
+      ctx.stroke();
+      p.tiltAngle += p.tiltAngleInc;
+      p.y += p.vy;
+      p.tilt = Math.sin(p.tiltAngle) * 12;
+    });
+    frame++;
+    if (frame < maxFrames) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  draw();
 }
 
 // ─── API Helpers ─────────────────────────────
@@ -312,3 +383,4 @@ function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+

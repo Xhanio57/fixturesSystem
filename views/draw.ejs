@@ -5,17 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Canlı Kura Çekimi</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
   <!-- GSAP (served locally from npm package) -->
   <script src="/js/gsap.min.js"></script>
 </head>
-<body class="draw-page">
+<body class="draw-page dark">
 
   <header class="site-header">
     <div class="header-inner">
-      <h1 class="site-title">🏆 Canlı Kura Çekimi</h1>
+      <h1 class="site-title">🥋 Canlı Kura Çekimi</h1>
       <nav class="header-nav">
         <a href="/" class="nav-link">Admin Paneli</a>
         <a href="/kura" class="nav-link active">Canlı Kura</a>
+        <a href="/sunum" class="nav-link" target="_blank">📺 Sunum</a>
       </nav>
     </div>
   </header>
@@ -27,14 +32,15 @@
       <h3 class="sidebar-title">Sikletler</h3>
       <ul class="category-menu" id="category-menu">
         <% categories.forEach(cat => { %>
-          <li class="category-menu-item <%= cat.isDrawCompleted ? 'completed' : '' %>"
+          <li class="category-menu-item <%= cat.drawStatus === 'Completed' ? 'completed' : '' %>"
               data-id="<%= cat._id %>"
-              data-slug="<%= encodeURIComponent(cat.name) %>">
+              data-slug="<%= encodeURIComponent(cat.name) %>"
+              data-brackettype="<%= cat.bracketType || 'DoubleRepechage' %>">
             <span class="cat-name"><%= cat.name %></span>
             <% if (cat.gender) { %>
               <span class="cat-meta"><%= cat.gender %></span>
             <% } %>
-            <% if (cat.isDrawCompleted) { %>
+            <% if (cat.drawStatus === 'Completed') { %>
               <span class="badge-done">✓ Çekildi</span>
             <% } %>
           </li>
@@ -60,6 +66,17 @@
           <div class="draw-header-meta" id="draw-cat-meta"></div>
         </div>
 
+        <!-- Pool legend (shown for Double Repechage) -->
+        <div id="pool-legend" class="pool-legend hidden">
+          <span class="pool-badge pool-A">A</span>
+          <span class="pool-badge pool-B">B</span>
+          <span class="pool-badge pool-C">C</span>
+          <span class="pool-badge pool-D">D</span>
+          <span class="pool-badge pool-rep">Rep</span>
+          <span class="pool-badge pool-bronze">Bronz</span>
+          <span id="bracket-type-label" class="text-xs opacity-60 ml-2"></span>
+        </div>
+
         <!-- Athlete list & slot machine -->
         <div class="draw-arena">
 
@@ -74,7 +91,7 @@
               <div class="slot-reel-container">
                 <div class="slot-reel" id="slot-reel"></div>
               </div>
-              <div class="slot-label">Eşleşme Çekiliyor...</div>
+              <div class="slot-label" id="slot-label">Eşleşme Çekiliyor...</div>
             </div>
             <button id="draw-btn" class="btn btn-draw">
               🎯 Kura Başlat
@@ -85,13 +102,19 @@
 
         <!-- Bracket / fixture tree -->
         <div class="bracket-section" id="bracket-section">
-          <h3 class="panel-subtitle bracket-subtitle">Fikstür Ağacı</h3>
+          <h3 class="panel-subtitle bracket-subtitle">
+            Fikstür Ağacı
+            <span id="bracket-type-badge" class="badge ml-2 text-xs"></span>
+          </h3>
           <div id="bracket-container" class="bracket-container"></div>
         </div>
 
       </div>
     </main>
   </div>
+
+  <!-- Confetti canvas overlay -->
+  <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;"></canvas>
 
   <!-- Toast notification -->
   <div id="toast" class="toast hidden"></div>
@@ -100,3 +123,4 @@
   <script src="/js/bracket.js"></script>
 </body>
 </html>
+

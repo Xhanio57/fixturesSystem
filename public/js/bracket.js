@@ -1,183 +1,265 @@
 /* ============================================
    SVG Tournament Bracket Renderer
+   Supports Single Elimination & Double Repechage
+   Pools A/B/C/D, Repechage tree, Bronze medals
    ============================================ */
 
 /**
- * renderBracket(matches, categoryName)
- * matches: array of Match objects (populated with athleteA, athleteB, winner)
- * categoryName: string for the title
+ * renderBracket(matches, category)
+ * matches: populated Match array
+ * category: Category object (or just a name string for backward compat)
  */
-function renderBracket(matches, categoryName) {
+function renderBracket(matches, category) {
   const container = document.getElementById('bracket-container');
   if (!matches || !matches.length) {
     container.innerHTML = '<p class="text-muted">Fikstür verisi yok.</p>';
     return;
   }
 
-  // Group by round
+  const isDoubleRep = typeof category === 'object'
+    ? category.bracketType === 'DoubleRepechage'
+    : false;
+
+  // Separate main bracket from repechage/bronze
+  const SPECIAL_POOLS = ['RepAB', 'RepCD', 'Bronze1', 'Bronze2'];
+  const mainMatches = matches.filter((m) => !SPECIAL_POOLS.includes(m.pool));
+  const repMatches = matches.filter((m) => SPECIAL_POOLS.includes(m.pool));
+
+  // Build the main bracket SVG
+  const mainSvg = buildMainBracketSvg(mainMatches);
+
+  if (isDoubleRep && repMatches.length) {
+    // Render repechage section below main bracket
+    const repSvg = buildRepechagelSvg(repMatches);
+    container.innerHTML = '';
+    container.appendChild(mainSvg);
+
+    const divider = document.createElement('div');
+    divider.className = 'bracket-repechage-title';
+    divider.innerHTML = '<span>🔄 Repechage (Çift Eleme) Ağacı</span>';
+    container.appendChild(divider);
+    container.appendChild(repSvg);
+  } else {
+    container.innerHTML = '';
+    container.appendChild(mainSvg);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   MAIN BRACKET SVG
+───────────────────────────────────────────── */
+function buildMainBracketSvg(matches) {
+  const MATCH_W = 210;
+  const MATCH_H = 82;
+  const MATCH_GAP_V = 18;
+  const ROUND_GAP_H = 72;
+  const PADDING = 40;
+  const ROUND_LABEL_H = 34;
+
+  // Group by roundNumber (exclude special pools)
   const rounds = {};
   matches.forEach((m) => {
     if (!rounds[m.roundNumber]) rounds[m.roundNumber] = [];
     rounds[m.roundNumber].push(m);
   });
 
-  const roundKeys = Object.keys(rounds)
-    .map(Number)
-    .sort((a, b) => a - b);
+  const roundKeys = Object.keys(rounds).map(Number).sort((a, b) => a - b);
+  if (!roundKeys.length) return svgEl('svg', { width: 0, height: 0 });
+
   const numRounds = roundKeys.length;
-
-  // Layout constants
-  const MATCH_W = 200;
-  const MATCH_H = 80;
-  const MATCH_GAP_V = 20; // vertical gap between matches in same round
-  const ROUND_GAP_H = 80; // horizontal gap between rounds
-  const PADDING = 40;
-  const ROUND_LABEL_H = 32;
-
-  // Calculate positions for each round
-  // Round 1 has 2^(numRounds-1) matches displayed vertically
   const round1Count = rounds[roundKeys[0]].length;
-  const totalMatchSlots = nextPow2(round1Count); // in case matches array is incomplete
+  const totalSlots = nextPow2Bracket(round1Count);
 
-  // Calculate total SVG dimensions
-  const totalH =
-    PADDING * 2 +
-    ROUND_LABEL_H +
-    totalMatchSlots * MATCH_H +
-    (totalMatchSlots - 1) * MATCH_GAP_V;
-
+  const slotH = MATCH_H + MATCH_GAP_V;
+  const totalH = PADDING * 2 + ROUND_LABEL_H + totalSlots * slotH;
   const totalW = PADDING * 2 + numRounds * MATCH_W + (numRounds - 1) * ROUND_GAP_H;
 
-  // Assign x positions per round
   const roundX = {};
   roundKeys.forEach((r, i) => {
     roundX[r] = PADDING + i * (MATCH_W + ROUND_GAP_H);
   });
 
-  // Assign y positions per round (centered vertically)
-  const matchPositions = {}; // key: `${round}-${matchIndex}` => {x, y, w, h}
-
+  // Calculate match (x,y) positions
+  const matchPos = {};
   roundKeys.forEach((r, ri) => {
-    const matchesInRound = rounds[r];
-    const groupSize = Math.pow(2, ri); // number of slots in the base round that this match covers
-    const slotH = MATCH_H + MATCH_GAP_V;
-
-    matchesInRound.forEach((m) => {
-      const idx = m.matchIndex;
-      // Center this match within its group of base slots
-      const groupStart = idx * groupSize * 2; // starting slot index in round 1
+    rounds[r].forEach((m) => {
+      const groupSize = Math.pow(2, ri);
+      const groupStart = m.matchIndex * groupSize * 2;
       const groupEnd = groupStart + groupSize * 2 - 1;
       const centerSlot = (groupStart + groupEnd) / 2;
       const y = PADDING + ROUND_LABEL_H + centerSlot * slotH + slotH / 2 - MATCH_H / 2;
-      const x = roundX[r];
-      matchPositions[`${r}-${idx}`] = { x, y, w: MATCH_W, h: MATCH_H, match: m };
+      matchPos[`${r}-${m.matchIndex}`] = { x: roundX[r], y, w: MATCH_W, h: MATCH_H, match: m };
     });
   });
 
-  // Build SVG
   const svg = svgEl('svg', {
-    width: totalW,
-    height: totalH,
+    width: totalW, height: totalH,
     viewBox: `0 0 ${totalW} ${totalH}`,
     xmlns: 'http://www.w3.org/2000/svg',
   });
+  svg.appendChild(svgEl('rect', { width: totalW, height: totalH, fill: 'var(--bg-secondary)' }));
 
-  // Background
-  const bg = svgEl('rect', {
-    width: totalW,
-    height: totalH,
-    fill: 'var(--bg-secondary)',
-  });
-  svg.appendChild(bg);
+  // Pool color bars (round 1)
+  const poolColors = { A: '#3b82f6', B: '#10b981', C: '#f59e0b', D: '#ef4444' };
+  if (rounds[roundKeys[0]]) {
+    rounds[roundKeys[0]].forEach((m) => {
+      const pos = matchPos[`${roundKeys[0]}-${m.matchIndex}`];
+      if (!pos || !poolColors[m.pool]) return;
+      const bar = svgEl('rect', {
+        x: pos.x - 6, y: pos.y, width: 6, height: pos.h,
+        rx: 3, fill: poolColors[m.pool],
+      });
+      svg.appendChild(bar);
+    });
+  }
 
   // Round labels
-  roundKeys.forEach((r, i) => {
+  roundKeys.forEach((r) => {
     const label = roundLabel(r, numRounds);
     const x = roundX[r] + MATCH_W / 2;
     const y = PADDING + ROUND_LABEL_H / 2 + 4;
-    const text = svgEl('text', {
-      x,
-      y,
-      'text-anchor': 'middle',
-      class: 'bracket-round-label',
-    });
+    const text = svgEl('text', { x, y, 'text-anchor': 'middle', class: 'bracket-round-label' });
     text.textContent = label;
     svg.appendChild(text);
   });
 
-  // Draw connector lines between rounds
+  // Connector lines
   roundKeys.forEach((r, ri) => {
     if (ri >= roundKeys.length - 1) return;
     const nextR = roundKeys[ri + 1];
-    const nextMatches = rounds[nextR] || [];
-
     rounds[r].forEach((m) => {
-      const pos = matchPositions[`${r}-${m.matchIndex}`];
-      if (!pos) return;
-
-      const nextMatchIndex = Math.floor(m.matchIndex / 2);
-      const nextPos = matchPositions[`${nextR}-${nextMatchIndex}`];
-      if (!nextPos) return;
-
-      // Line from right edge of current match to left edge of next match
-      const x1 = pos.x + pos.w;
-      const y1 = pos.y + pos.h / 2;
-      const x2 = nextPos.x;
-      const y2 = nextPos.y + nextPos.h / 2;
+      const pos = matchPos[`${r}-${m.matchIndex}`];
+      const nextPos = matchPos[`${nextR}-${Math.floor(m.matchIndex / 2)}`];
+      if (!pos || !nextPos) return;
+      const x1 = pos.x + pos.w, y1 = pos.y + pos.h / 2;
+      const x2 = nextPos.x, y2 = nextPos.y + nextPos.h / 2;
       const midX = x1 + (x2 - x1) / 2;
-
-      const path = svgEl('path', {
+      svg.appendChild(svgEl('path', {
         d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`,
         class: 'bracket-line',
-      });
-      svg.appendChild(path);
+      }));
     });
   });
 
-  // Draw match boxes
-  Object.values(matchPositions).forEach(({ x, y, w, h, match }) => {
+  // Match boxes
+  Object.values(matchPos).forEach(({ x, y, w, h, match }) => {
     const g = svgEl('g');
+    const cls = match.winner ? 'bracket-match-rect highlight' : 'bracket-match-rect';
+    g.appendChild(svgEl('rect', { x, y, width: w, height: h, rx: 6, class: cls }));
+    g.appendChild(svgEl('line', { x1: x, y1: y + h / 2, x2: x + w, y2: y + h / 2, stroke: 'var(--border)', 'stroke-width': 1 }));
 
-    // Match rectangle
-    const rect = svgEl('rect', {
-      x,
-      y,
-      width: w,
-      height: h,
-      rx: 6,
-      class: `bracket-match-rect ${match.winner ? 'highlight' : ''}`,
-    });
-    g.appendChild(rect);
+    // Pool badge
+    if (match.pool && ['A','B','C','D'].includes(match.pool)) {
+      const badge = svgEl('rect', { x: x + w - 22, y: y + 4, width: 18, height: 16, rx: 3,
+        fill: poolColors[match.pool] || '#666', opacity: 0.9 });
+      const badgeTxt = svgEl('text', { x: x + w - 13, y: y + 16, 'text-anchor': 'middle',
+        'font-size': 10, fill: '#fff', 'font-weight': 'bold' });
+      badgeTxt.textContent = match.pool;
+      g.appendChild(badge);
+      g.appendChild(badgeTxt);
+    }
 
-    // Divider line
-    const divider = svgEl('line', {
-      x1: x,
-      y1: y + h / 2,
-      x2: x + w,
-      y2: y + h / 2,
-      stroke: 'var(--border)',
-      'stroke-width': 1,
-    });
-    g.appendChild(divider);
-
-    // Athlete A text
-    const textA = athleteText(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 5);
-    g.appendChild(textA);
-
-    // Athlete B text
-    const textB = athleteText(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 5);
-    g.appendChild(textB);
-
+    g.appendChild(athleteTextSvg(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 6));
+    g.appendChild(athleteTextSvg(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 6));
     svg.appendChild(g);
   });
 
-  container.innerHTML = '';
-  container.appendChild(svg);
+  return svg;
 }
 
-// ─── Helpers ─────────────────────────────────
-function athleteText(athlete, isBye, winner, x, y) {
-  const text = svgEl('text', { x, y, class: 'bracket-text' });
+/* ─────────────────────────────────────────────
+   REPECHAGE + BRONZE SVG
+───────────────────────────────────────────── */
+function buildRepechagelSvg(repMatches) {
+  const MATCH_W = 210;
+  const MATCH_H = 82;
+  const MATCH_GAP_V = 30;
+  const ROUND_GAP_H = 90;
+  const PADDING = 40;
+  const LABEL_H = 34;
+
+  // Layout: RepAB | RepCD → Bronze1 | Bronze2
+  // Pool order: RepAB (0,0), RepCD (0,1), Bronze1 (1,0), Bronze2 (1,1)
+  const poolOrder = { RepAB: { col: 0, row: 0 }, RepCD: { col: 0, row: 1 }, Bronze1: { col: 1, row: 0 }, Bronze2: { col: 1, row: 1 } };
+  const poolLabels = { RepAB: 'Repechage A/B', RepCD: 'Repechage C/D', Bronze1: '🥉 Bronz Madalya 1', Bronze2: '🥉 Bronz Madalya 2' };
+
+  const slotH = MATCH_H + MATCH_GAP_V;
+  const numCols = 2;
+  const numRows = 2;
+  const totalW = PADDING * 2 + numCols * MATCH_W + (numCols - 1) * ROUND_GAP_H;
+  const totalH = PADDING * 2 + LABEL_H + numRows * MATCH_H + (numRows - 1) * MATCH_GAP_V;
+
+  const posMap = {};
+  repMatches.forEach((m) => {
+    const layout = poolOrder[m.pool];
+    if (!layout) return;
+    const x = PADDING + layout.col * (MATCH_W + ROUND_GAP_H);
+    const y = PADDING + LABEL_H + layout.row * slotH;
+    posMap[m.pool] = { x, y, w: MATCH_W, h: MATCH_H, match: m };
+  });
+
+  const svg = svgEl('svg', {
+    width: totalW, height: totalH + 20,
+    viewBox: `0 0 ${totalW} ${totalH + 20}`,
+    xmlns: 'http://www.w3.org/2000/svg',
+  });
+  svg.appendChild(svgEl('rect', { width: totalW, height: totalH + 20, fill: 'var(--bg-elevated)' }));
+
+  // Column headers
+  ['Repechage Turu', 'Bronz Madalya Maçları'].forEach((label, col) => {
+    const x = PADDING + col * (MATCH_W + ROUND_GAP_H) + MATCH_W / 2;
+    const t = svgEl('text', { x, y: PADDING + LABEL_H / 2 + 4, 'text-anchor': 'middle', class: 'bracket-round-label' });
+    t.textContent = label;
+    svg.appendChild(t);
+  });
+
+  // Connector: RepAB winner → Bronze1 slot B
+  const repABPos = posMap['RepAB'];
+  const bronze1Pos = posMap['Bronze1'];
+  if (repABPos && bronze1Pos) {
+    const x1 = repABPos.x + repABPos.w, y1 = repABPos.y + repABPos.h / 2;
+    const x2 = bronze1Pos.x, y2 = bronze1Pos.y + (3 * bronze1Pos.h) / 4;
+    const midX = x1 + (x2 - x1) / 2;
+    svg.appendChild(svgEl('path', { d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`, class: 'bracket-line bracket-line--rep' }));
+  }
+
+  // Connector: RepCD winner → Bronze2 slot B
+  const repCDPos = posMap['RepCD'];
+  const bronze2Pos = posMap['Bronze2'];
+  if (repCDPos && bronze2Pos) {
+    const x1 = repCDPos.x + repCDPos.w, y1 = repCDPos.y + repCDPos.h / 2;
+    const x2 = bronze2Pos.x, y2 = bronze2Pos.y + (3 * bronze2Pos.h) / 4;
+    const midX = x1 + (x2 - x1) / 2;
+    svg.appendChild(svgEl('path', { d: `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`, class: 'bracket-line bracket-line--rep' }));
+  }
+
+  // Match boxes
+  Object.entries(posMap).forEach(([pool, { x, y, w, h, match }]) => {
+    const g = svgEl('g');
+    const cls = match.winner
+      ? 'bracket-match-rect bracket-match-rect--rep highlight'
+      : 'bracket-match-rect bracket-match-rect--rep';
+    g.appendChild(svgEl('rect', { x, y, width: w, height: h, rx: 6, class: cls }));
+    g.appendChild(svgEl('line', { x1: x, y1: y + h / 2, x2: x + w, y2: y + h / 2, stroke: 'var(--border)', 'stroke-width': 1 }));
+
+    // Pool label
+    const labelTxt = svgEl('text', { x: x + 6, y: y - 6, class: 'bracket-pool-label' });
+    labelTxt.textContent = poolLabels[pool] || pool;
+    g.appendChild(labelTxt);
+
+    g.appendChild(athleteTextSvg(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 6));
+    g.appendChild(athleteTextSvg(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 6));
+    svg.appendChild(g);
+  });
+
+  return svg;
+}
+
+/* ─────────────────────────────────────────────
+   SHARED HELPERS
+───────────────────────────────────────────── */
+function athleteTextSvg(athlete, isBye, winner, x, y) {
+  const text = svgEl('text', { x, y });
 
   let label = '—';
   let cls = 'bracket-text';
@@ -187,14 +269,12 @@ function athleteText(athlete, isBye, winner, x, y) {
     cls = 'bracket-text bye';
   } else if (athlete) {
     label = `${athlete.lastName}, ${athlete.firstName}`;
-    if (athlete.isSeeded) cls = 'bracket-text seeded';
-    if (winner && String(winner._id || winner) === String(athlete._id)) {
-      cls += ' winner';
-    }
+    if (athlete.seedIndex) cls = 'bracket-text seeded';
+    if (winner && String(winner._id || winner) === String(athlete._id)) cls += ' winner';
   }
 
   text.setAttribute('class', cls);
-  text.textContent = truncate(label, 22);
+  text.textContent = truncateBracket(label, 24);
   return text;
 }
 
@@ -212,13 +292,14 @@ function svgEl(tag, attrs = {}) {
   return el;
 }
 
-function truncate(str, maxLen) {
+function truncateBracket(str, maxLen) {
   if (!str) return '';
   return str.length > maxLen ? str.slice(0, maxLen - 1) + '…' : str;
 }
 
-function nextPow2(n) {
+function nextPow2Bracket(n) {
   let p = 1;
   while (p < n) p *= 2;
   return p;
 }
+

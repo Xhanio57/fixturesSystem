@@ -50,18 +50,20 @@ function renderCategories() {
     container.innerHTML = '<p class="loading-text">Henüz siklet eklenmemiş.</p>';
     return;
   }
+  const bracketLabels = { DoubleRepechage: 'Çift Repechage', SingleElimination: 'Tek Eleme' };
   container.innerHTML = categoriesCache
     .map(
       (cat) => `
-    <div class="list-item ${cat.isDrawCompleted ? 'completed' : ''}" data-id="${cat._id}">
+    <div class="list-item ${cat.drawStatus === 'Completed' ? 'completed' : ''}" data-id="${cat._id}">
       <div class="item-info">
         <div class="item-name">${escHtml(cat.name)}</div>
         <div class="item-meta">${escHtml(cat.gender)}${cat.ageGroup ? ' · ' + escHtml(cat.ageGroup) : ''}
-          ${cat.isDrawCompleted ? '<span class="badge-done">✓ Kura Çekildi</span>' : ''}
+          · <span class="text-xs opacity-70">${escHtml(bracketLabels[cat.bracketType] || cat.bracketType || 'Çift Repechage')}</span>
+          ${cat.drawStatus === 'Completed' ? '<span class="badge-done">✓ Kura Çekildi</span>' : ''}
         </div>
       </div>
       <div class="item-actions">
-        ${!cat.isDrawCompleted
+        ${cat.drawStatus !== 'Completed'
           ? `<button class="btn btn-sm btn-danger" onclick="deleteCategory('${cat._id}')">Sil</button>`
           : `<button class="btn btn-sm btn-secondary" onclick="resetDraw('${cat._id}')">Kuradan Çıkar</button>`
         }
@@ -96,6 +98,7 @@ async function handleAddCategory(e) {
     name: document.getElementById('cat-name').value.trim(),
     gender: document.getElementById('cat-gender').value,
     ageGroup: document.getElementById('cat-ageGroup').value.trim(),
+    bracketType: document.getElementById('cat-bracketType').value,
   };
   try {
     await apiFetch('/api/categories', { method: 'POST', body: JSON.stringify(body) });
@@ -154,6 +157,7 @@ function renderAthletes() {
     container.innerHTML = '<p class="loading-text">Sporcu bulunamadı.</p>';
     return;
   }
+  const seedEmoji = ['', '🥇', '🥈', '🥉', '4️⃣'];
   container.innerHTML = filtered
     .map(
       (ath) => `
@@ -161,12 +165,13 @@ function renderAthletes() {
       <div class="item-info">
         <div class="item-name">
           ${escHtml(ath.lastName)}, ${escHtml(ath.firstName)}
-          ${ath.isSeeded ? '<span class="badge badge-seeded">★ Seribaşı</span>' : ''}
+          ${ath.seedIndex ? `<span class="badge badge-seeded">${seedEmoji[ath.seedIndex] || '★'} Seri${ath.seedIndex}</span>` : ''}
+          ${ath.isWinner ? '<span class="badge badge-winner">🏆 Şampiyon</span>' : ''}
         </div>
         <div class="item-meta">
           ${ath.club ? escHtml(ath.club) + ' · ' : ''}
           ${ath.category ? escHtml(ath.category.name) : ''}
-          ${ath.category && ath.category.isDrawCompleted ? '<span class="badge-done">Kura Tamamlandı</span>' : ''}
+          ${ath.category && ath.category.drawStatus === 'Completed' ? '<span class="badge-done">Kura Tamamlandı</span>' : ''}
         </div>
       </div>
       <div class="item-actions">
@@ -181,12 +186,13 @@ function renderAthletes() {
 
 async function handleAddAthlete(e) {
   e.preventDefault();
+  const seedVal = document.getElementById('ath-seedIndex').value;
   const body = {
     firstName: document.getElementById('ath-firstName').value.trim(),
     lastName: document.getElementById('ath-lastName').value.trim(),
     club: document.getElementById('ath-club').value.trim(),
     category: document.getElementById('ath-category').value,
-    isSeeded: document.getElementById('ath-seeded').checked,
+    seedIndex: seedVal ? Number(seedVal) : null,
   };
   if (!body.category) {
     showToast('Lütfen bir siklet seçin', 'error');
@@ -197,7 +203,7 @@ async function handleAddAthlete(e) {
     document.getElementById('ath-firstName').value = '';
     document.getElementById('ath-lastName').value = '';
     document.getElementById('ath-club').value = '';
-    document.getElementById('ath-seeded').checked = false;
+    document.getElementById('ath-seedIndex').value = '';
     showToast('Sporcu eklendi', 'success');
     await loadAthletes();
   } catch (err) {
@@ -223,7 +229,7 @@ function openEditModal(id) {
   document.getElementById('edit-firstName').value = ath.firstName;
   document.getElementById('edit-lastName').value = ath.lastName;
   document.getElementById('edit-club').value = ath.club || '';
-  document.getElementById('edit-seeded').checked = ath.isSeeded;
+  document.getElementById('edit-seedIndex').value = ath.seedIndex || '';
   populateCategorySelects();
   document.getElementById('edit-category').value = ath.category ? ath.category._id : '';
   document.getElementById('edit-modal').classList.remove('hidden');
@@ -235,12 +241,13 @@ function closeModal() {
 
 async function handleEditSave() {
   const id = document.getElementById('edit-id').value;
+  const seedVal = document.getElementById('edit-seedIndex').value;
   const body = {
     firstName: document.getElementById('edit-firstName').value.trim(),
     lastName: document.getElementById('edit-lastName').value.trim(),
     club: document.getElementById('edit-club').value.trim(),
     category: document.getElementById('edit-category').value,
-    isSeeded: document.getElementById('edit-seeded').checked,
+    seedIndex: seedVal ? Number(seedVal) : null,
   };
   try {
     await apiFetch(`/api/athletes/${id}`, { method: 'PUT', body: JSON.stringify(body) });

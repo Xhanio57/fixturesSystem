@@ -45,7 +45,7 @@ exports.getAthlete = async (req, res) => {
 exports.createAthlete = async (req, res) => {
   try {
     // Validate and extract only allowed fields
-    const { firstName, lastName, club, category, isSeeded } = req.body;
+    const { firstName, lastName, club, category, isSeeded, seedIndex } = req.body;
     if (!category || !isValidObjectId(category)) {
       return res.status(400).json({ success: false, message: 'Geçersiz veya eksik kategori ID' });
     }
@@ -54,13 +54,26 @@ exports.createAthlete = async (req, res) => {
     if (!categoryDoc) {
       return res.status(404).json({ success: false, message: 'Kategori bulunamadı' });
     }
-    if (categoryDoc.isDrawCompleted) {
+    if (categoryDoc.drawStatus === 'Completed') {
       return res.status(400).json({
         success: false,
         message: 'Bu kategoride kura tamamlanmış. Sporcu eklenemez.',
       });
     }
-    const athlete = await Athlete.create({ firstName, lastName, club, category, isSeeded: !!isSeeded });
+    // Parse seedIndex: must be 1-4 or null
+    let parsedSeedIndex = null;
+    if (seedIndex !== undefined && seedIndex !== null && seedIndex !== '') {
+      const n = Number(seedIndex);
+      if (!Number.isNaN(n) && n >= 1 && n <= 4) parsedSeedIndex = n;
+    }
+    const athlete = await Athlete.create({
+      firstName: String(firstName),
+      lastName: String(lastName),
+      club: club ? String(club) : '',
+      category,
+      seedIndex: parsedSeedIndex,
+      isSeeded: parsedSeedIndex !== null,
+    });
     const populated = await Athlete.findById(athlete._id).populate('category', 'name');
     res.status(201).json({ success: true, data: populated });
   } catch (err) {
@@ -89,14 +102,14 @@ exports.updateAthlete = async (req, res) => {
       if (!targetCategory) {
         return res.status(404).json({ success: false, message: 'Hedef kategori bulunamadı' });
       }
-      if (targetCategory.isDrawCompleted) {
+      if (targetCategory.drawStatus === 'Completed') {
         return res.status(400).json({
           success: false,
           message: 'Hedef kategoride kura tamamlanmış. Sporcu taşınamaz.',
         });
       }
       // Also check source category
-      if (athlete.category.isDrawCompleted) {
+      if (athlete.category.drawStatus === 'Completed') {
         return res.status(400).json({
           success: false,
           message: 'Mevcut kategoride kura tamamlanmış. Sporcu taşınamaz.',
@@ -109,7 +122,12 @@ exports.updateAthlete = async (req, res) => {
     if (req.body.lastName !== undefined) updateData.lastName = String(req.body.lastName);
     if (req.body.club !== undefined) updateData.club = String(req.body.club);
     if (req.body.category !== undefined) updateData.category = String(req.body.category);
-    if (req.body.isSeeded !== undefined) updateData.isSeeded = !!req.body.isSeeded;
+    // Handle seedIndex
+    if (req.body.seedIndex !== undefined) {
+      const n = Number(req.body.seedIndex);
+      updateData.seedIndex = (!Number.isNaN(n) && n >= 1 && n <= 4) ? n : null;
+      updateData.isSeeded = updateData.seedIndex !== null;
+    }
 
     const updated = await Athlete.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
@@ -131,7 +149,7 @@ exports.deleteAthlete = async (req, res) => {
     if (!athlete) {
       return res.status(404).json({ success: false, message: 'Sporcu bulunamadı' });
     }
-    if (athlete.category && athlete.category.isDrawCompleted) {
+    if (athlete.category && athlete.category.drawStatus === 'Completed') {
       return res.status(400).json({
         success: false,
         message: 'Kura tamamlanmış kategoriden sporcu silinemez.',
