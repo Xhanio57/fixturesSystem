@@ -72,7 +72,7 @@ function poolForSlot(slotIndex, bracketSize) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   SMART SWAP BRACKET BUILDER
+   BRACKET BUILDER WITH PROACTIVE CONFLICT DISTRIBUTION
    Seeds placed at IJF canonical positions derived from numberToBoxMap:
      Seed 1 → draw pos 1 → visual index 0       (Pool A top)
      Seed 2 → draw pos 2 → visual index n/2      (Pool C top)
@@ -80,12 +80,19 @@ function poolForSlot(slotIndex, bracketSize) {
      Seed 4 → draw pos 4 → visual index 3n/4     (Pool D top)
    BYE distribution: seeds get BYEs adjacent first; remainder
      spread evenly floor(total/4) per pool.
-   Clash prevention: scan each pool for two athletes from the same
-     club OR country and swap one with a different pool.
-───────────────────────────────────────────────────────────── */
+   Clash prevention (proactive, not reactive):
+     1. Group non-seeded athletes by country (primary) then club (secondary).
+     2. Sort groups largest-first.
+     3. Round-robin distribute each group across pools so athletes from the
+        same country/club land in different pools as much as possible.
+     4. Slot positions within each pool are shuffled for randomness.
+     5. Secondary pass: swap any remaining same-club/country pair within a
+        pool with a non-conflicting athlete from another pool.
+─────────────────────────────────────────────────────────────── */
 function buildBracketWithSmartSwap(athletes, bracketSize) {
   const n = athletes.length;
   const totalBYEs = bracketSize - n;
+  const numPools = bracketSize >= 8 ? 4 : 1;
   const poolSize = Math.max(bracketSize / 4, 1);
   const boxMap = generateNumberToBoxMap(bracketSize);
 
@@ -93,27 +100,22 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
   const seeded = athletes
     .filter((a) => a.seedIndex && a.seedIndex >= 1)
     .sort((a, b) => a.seedIndex - b.seedIndex);
-  const nonSeeded = athletes.filter((a) => !a.seedIndex);
-  shuffle(nonSeeded);
+  const nonSeeded = shuffle(athletes.filter((a) => !a.seedIndex));
 
   const slots = new Array(bracketSize).fill(null); // null = BYE
 
-  // IJF canonical seed positions: seeds 1-4 go to draw positions 1, 2, 3, 4
-  // which map to visual indices derived from the numberToBoxMap
+  // ── Place seeds at IJF canonical positions ──
   const seedDrawPositions = [1, 2, 3, 4];
   const seedVisualIndices = seedDrawPositions.map((dp) => visualIndexForDrawPos(boxMap, dp));
-
   seeded.forEach((ath, i) => {
     if (i < seedVisualIndices.length) slots[seedVisualIndices[i]] = ath;
   });
 
   // ── Balanced BYE distribution ──
-  // Phase 1: seed adjacent slots get BYEs first (seeded athletes get a bye in R1)
-  const adjacentOfSeed = seedVisualIndices.map((vi) => {
-    // The adjacent slot is the paired slot in the same R1 match
-    // If vi is even → vi+1; if vi is odd → vi-1
-    return vi % 2 === 0 ? vi + 1 : vi - 1;
-  });
+  // Phase 1: give BYEs to seed-adjacent slots (seeded athletes advance free in R1)
+  const adjacentOfSeed = seedVisualIndices.map((vi) =>
+    vi % 2 === 0 ? vi + 1 : vi - 1
+  );
   const byeSet = new Set();
   let byesUsed = 0;
   for (let i = 0; i < Math.min(seeded.length, adjacentOfSeed.length) && byesUsed < totalBYEs; i++) {
@@ -123,13 +125,11 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
       byesUsed++;
     }
   }
-
-  // Phase 2: remaining BYEs distributed evenly across pools
+  // Phase 2: distribute remaining BYEs evenly across pools
   if (bracketSize >= 8 && byesUsed < totalBYEs) {
-    const remaining = totalBYEs - byesUsed;
-    const byesPerPool = new Array(4).fill(Math.floor(remaining / 4));
-    for (let i = 0; i < remaining % 4; i++) byesPerPool[i]++;
-
+    const rem = totalBYEs - byesUsed;
+    const byesPerPool = new Array(4).fill(Math.floor(rem / 4));
+    for (let i = 0; i < rem % 4; i++) byesPerPool[i]++;
     for (let poolIdx = 0; poolIdx < 4; poolIdx++) {
       const start = poolIdx * poolSize;
       const end = start + poolSize;
@@ -145,53 +145,128 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
     }
   }
 
-  // ── Fill non-BYE slots with remaining athletes ──
-  const remaining = [...seeded.slice(Math.min(seeded.length, seedVisualIndices.length)), ...nonSeeded];
-  let ri = 0;
-  for (let i = 0; i < bracketSize; i++) {
-    if (slots[i] === null && !byeSet.has(i)) {
-      if (ri < remaining.length) slots[i] = remaining[ri++];
+  // ── Collect free (non-BYE, non-seed) slot indices per pool, shuffled ──
+  const poolFreeSlots = Array.from({ length: numPools }, (_, p) => {
+    const start = p * poolSize;
+    const end = start + poolSize;
+    const free = [];
+    for (let i = start; i < end; i++) {
+      if (slots[i] === null && !byeSet.has(i)) free.push(i);
+    }
+    return shuffle(free); // randomize positions within each pool
+  });
+
+  if (numPools === 1) {
+    // Small brackets: no pools, just fill available slots in order
+    let ri = 0;
+    for (let i = 0; i < bracketSize && ri < nonSeeded.length; i++) {
+      if (slots[i] === null && !byeSet.has(i)) slots[i] = nonSeeded[ri++];
+    }
+    return { slots, boxMap };
+  }
+
+  // ── Group non-seeded athletes by conflict key ──
+  // Primary key: country (keeps same-country athletes in separate pools)
+  // Secondary key: club (for athletes with no country, or same-country sub-groups)
+  // Athletes with neither country nor club share no conflict with anyone.
+  const countryGroups = new Map(); // country → [athletes]
+  const clubOnlyGroups = new Map(); // club → [athletes]  (country absent)
+  const soloAthletes   = [];        // no country, no club → place freely
+
+  for (const ath of nonSeeded) {
+    const country = ath.country && ath.country.trim();
+    const club    = ath.club    && ath.club.trim();
+    if (country) {
+      if (!countryGroups.has(country)) countryGroups.set(country, []);
+      countryGroups.get(country).push(ath);
+    } else if (club) {
+      if (!clubOnlyGroups.has(club)) clubOnlyGroups.set(club, []);
+      clubOnlyGroups.get(club).push(ath);
+    } else {
+      soloAthletes.push(ath);
     }
   }
-  for (let i = 0; i < bracketSize && ri < remaining.length; i++) {
-    if (slots[i] === null && !byeSet.has(i)) slots[i] = remaining[ri++];
+
+  // ── Assign athletes to pool queues using round-robin per conflict group ──
+  // Largest groups first ensures the best possible distribution.
+  const poolQueues = Array.from({ length: numPools }, () => []);
+
+  function roundRobinAssign(groups) {
+    groups.sort((a, b) => b.length - a.length);
+    for (const group of groups) {
+      shuffle(group); // randomize within group
+      // Start at the pool currently holding the fewest athletes (balanced baseline)
+      let startPool = poolQueues.reduce(
+        (minP, q, p) => (q.length < poolQueues[minP].length ? p : minP), 0
+      );
+      for (let i = 0; i < group.length; i++) {
+        poolQueues[(startPool + i) % numPools].push(group[i]);
+      }
+    }
   }
 
-  // ── Smart Swap: resolve club AND country conflicts within each pool ──
-  if (bracketSize >= 8) {
-    const qSize = bracketSize / 4;
-    for (let poolIdx = 0; poolIdx < 4; poolIdx++) {
-      const start = poolIdx * qSize;
-      const end = start + qSize;
+  roundRobinAssign([...countryGroups.values()]);
+  roundRobinAssign([...clubOnlyGroups.values()]);
 
-      for (let i = start; i < end; i++) {
-        if (!slots[i]) continue;
-        for (let j = i + 1; j < end; j++) {
-          if (!slots[j]) continue;
-          // Conflict: same club or same country (if both non-empty)
-          const sameClub = slots[i].club && slots[j].club && slots[i].club === slots[j].club;
-          const sameCountry = slots[i].country && slots[j].country && slots[i].country === slots[j].country;
-          if (!sameClub && !sameCountry) continue;
+  // Solo athletes fill the emptiest pool at each step
+  for (const ath of soloAthletes) {
+    const minPool = poolQueues.reduce(
+      (minP, q, p) => (q.length < poolQueues[minP].length ? p : minP), 0
+    );
+    poolQueues[minPool].push(ath);
+  }
 
-          let swapped = false;
-          for (let k = 0; k < bracketSize && !swapped; k++) {
-            if (k >= start && k < end) continue;
-            if (!slots[k]) continue;
-            if (slots[k].seedIndex) continue;
+  // ── Place athletes from pool queues into their pool's free slots ──
+  const overflow = [];
+  for (let p = 0; p < numPools; p++) {
+    const freeSlots = poolFreeSlots[p];
+    const queue     = poolQueues[p];
+    const count     = Math.min(freeSlots.length, queue.length);
+    for (let i = 0; i < count; i++) slots[freeSlots[i]] = queue[i];
+    // Athletes that don't fit (pool was full) become overflow
+    if (queue.length > freeSlots.length) {
+      overflow.push(...queue.slice(freeSlots.length));
+    }
+  }
 
-            const kPoolStart = Math.floor(k / qSize) * qSize;
-            const kPoolEnd = kPoolStart + qSize;
-            let newConflict = false;
-            for (let m = kPoolStart; m < kPoolEnd && !newConflict; m++) {
-              if (m === k || !slots[m]) continue;
-              const kSameClub = slots[m].club && slots[j].club && slots[m].club === slots[j].club;
-              const kSameCountry = slots[m].country && slots[j].country && slots[m].country === slots[j].country;
-              if (kSameClub || kSameCountry) newConflict = true;
-            }
-            if (!newConflict) {
-              [slots[j], slots[k]] = [slots[k], slots[j]];
-              swapped = true;
-            }
+  // Overflow athletes fill any remaining empty slots (best-effort, any pool)
+  if (overflow.length) {
+    let oi = 0;
+    for (let i = 0; i < bracketSize && oi < overflow.length; i++) {
+      if (slots[i] === null && !byeSet.has(i)) slots[i] = overflow[oi++];
+    }
+  }
+
+  // ── Secondary pass: resolve any residual same-country/same-club pairs ──
+  // This handles edge cases where perfect separation was impossible
+  // (e.g. 5+ athletes from the same country with only 4 pools).
+  const qSize = bracketSize / 4;
+  for (let poolIdx = 0; poolIdx < 4; poolIdx++) {
+    const start = poolIdx * qSize;
+    const end   = start + qSize;
+    for (let i = start; i < end; i++) {
+      if (!slots[i] || slots[i].seedIndex) continue;
+      for (let j = i + 1; j < end; j++) {
+        if (!slots[j] || slots[j].seedIndex) continue;
+        const sameClub    = slots[i].club    && slots[j].club    && slots[i].club    === slots[j].club;
+        const sameCountry = slots[i].country && slots[j].country && slots[i].country === slots[j].country;
+        if (!sameClub && !sameCountry) continue;
+        // Try to swap slots[j] with a non-conflicting athlete from another pool
+        let swapped = false;
+        for (let k = 0; k < bracketSize && !swapped; k++) {
+          if (k >= start && k < end) continue;
+          if (!slots[k] || slots[k].seedIndex) continue;
+          const kStart = Math.floor(k / qSize) * qSize;
+          const kEnd   = kStart + qSize;
+          let conflict = false;
+          for (let m = kStart; m < kEnd && !conflict; m++) {
+            if (m === k || !slots[m]) continue;
+            if (slots[m].club    && slots[j].club    && slots[m].club    === slots[j].club)    conflict = true;
+            if (slots[m].country && slots[j].country && slots[m].country === slots[j].country) conflict = true;
+          }
+          if (!conflict) {
+            [slots[j], slots[k]] = [slots[k], slots[j]];
+            swapped = true;
           }
         }
       }
