@@ -83,10 +83,14 @@ function poolForSlot(slotIndex, bracketSize) {
    Clash prevention (proactive, not reactive):
      1. Group non-seeded athletes by country (primary) then club (secondary).
      2. Sort groups largest-first.
-     3. Round-robin distribute each group across pools so athletes from the
+     3. Within each country group, cluster same-club athletes together
+        (largest club first, shuffled within each club).  This guarantees
+        that the outer round-robin assigns each club's athletes to different
+        pools (consecutive positions always map to different pools).
+     4. Round-robin distribute each group across pools so athletes from the
         same country/club land in different pools as much as possible.
-     4. Slot positions within each pool are shuffled for randomness.
-     5. Secondary pass: swap any remaining same-club/country pair within a
+     5. Slot positions within each pool are shuffled for randomness.
+     6. Secondary pass: swap any remaining same-club/country pair within a
         pool with a non-conflicting athlete from another pool.
 ─────────────────────────────────────────────────────────────── */
 function buildBracketWithSmartSwap(athletes, bracketSize) {
@@ -203,13 +207,29 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
   function roundRobinAssign(groups) {
     groups.sort((a, b) => b.length - a.length);
     for (const group of groups) {
-      shuffle(group); // randomize within group
+      // Cluster same-club athletes together (largest club first, shuffled within
+      // each club bucket).  Consecutive positions in the flattened list always
+      // map to different pools in the round-robin below, so athletes that share
+      // a club will never be assigned to the same pool.
+      // (A plain shuffle would let same-club athletes land at the same modulo
+      //  positions, e.g. 0, 4, 8, 12, and end up in the same pool.)
+      const clubBuckets = new Map();
+      for (const ath of group) {
+        const key = (ath.club && ath.club.trim()) || '';
+        if (!clubBuckets.has(key)) clubBuckets.set(key, []);
+        clubBuckets.get(key).push(ath);
+      }
+      // Largest club first; shuffle within each bucket for randomness
+      const orderedGroup = [...clubBuckets.values()]
+        .sort((a, b) => b.length - a.length)
+        .flatMap((bucket) => shuffle(bucket));
+
       // Start at the pool currently holding the fewest athletes (balanced baseline)
       let startPool = poolQueues.reduce(
         (minPoolIndex, q, p) => (q.length < poolQueues[minPoolIndex].length ? p : minPoolIndex), 0
       );
-      for (let i = 0; i < group.length; i++) {
-        poolQueues[(startPool + i) % numPools].push(group[i]);
+      for (let i = 0; i < orderedGroup.length; i++) {
+        poolQueues[(startPool + i) % numPools].push(orderedGroup[i]);
       }
     }
   }
