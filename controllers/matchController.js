@@ -107,19 +107,28 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
   // ── Place seeds at IJF canonical positions ──
   const seedDrawPositions = [1, 2, 3, 4];
   const seedVisualIndices = seedDrawPositions.map((dp) => visualIndexForDrawPos(boxMap, dp));
-  seeded.forEach((ath, i) => {
-    if (i < seedVisualIndices.length) slots[seedVisualIndices[i]] = ath;
+  seeded.forEach((ath) => {
+    // Use the athlete's actual seedIndex (1-4) to pick the correct canonical position,
+    // so seed 2 always lands at Pool C regardless of whether seed 1 is present.
+    const posIdx = ath.seedIndex - 1;
+    if (posIdx >= 0 && posIdx < seedVisualIndices.length) {
+      slots[seedVisualIndices[posIdx]] = ath;
+    }
   });
 
   // ── Balanced BYE distribution ──
   // Phase 1: give BYEs to seed-adjacent slots (seeded athletes advance free in R1)
+  // Use the seed's actual canonical position index (seedIndex-1), not iteration order.
   const adjacentOfSeed = seedVisualIndices.map((vi) =>
     vi % 2 === 0 ? vi + 1 : vi - 1
   );
   const byeSet = new Set();
   let byesUsed = 0;
-  for (let i = 0; i < Math.min(seeded.length, adjacentOfSeed.length) && byesUsed < totalBYEs; i++) {
-    const adj = adjacentOfSeed[i];
+  for (const ath of seeded) {
+    if (byesUsed >= totalBYEs) break;
+    const posIdx = ath.seedIndex - 1;
+    if (posIdx < 0 || posIdx >= adjacentOfSeed.length) continue;
+    const adj = adjacentOfSeed[posIdx];
     if (adj >= 0 && adj < bracketSize && !byeSet.has(adj) && slots[adj] === null) {
       byeSet.add(adj);
       byesUsed++;
