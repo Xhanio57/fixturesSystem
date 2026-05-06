@@ -1209,18 +1209,21 @@ select.form-input option {
 }
 
 :fullscreen .draw-layout,
-:-webkit-full-screen .draw-layout {
+:-webkit-full-screen .draw-layout,
+:-moz-full-screen .draw-layout {
   height: 100vh;
 }
 
 :fullscreen .draw-main,
-:-webkit-full-screen .draw-main {
+:-webkit-full-screen .draw-main,
+:-moz-full-screen .draw-main {
   width: 100%;
   padding: 20px 24px;
 }
 
 :fullscreen .bracket-container svg,
-:-webkit-full-screen .bracket-container svg {
+:-webkit-full-screen .bracket-container svg,
+:-moz-full-screen .bracket-container svg {
   width: 100%;
   height: auto;
 }
