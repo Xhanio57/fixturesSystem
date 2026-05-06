@@ -198,6 +198,9 @@ async function runDraw() {
   drawBtn.disabled = true;
   drawBtn.textContent = '⏳ Kura Çekiliyor...';
 
+  // Request fullscreen for optimal presentation
+  document.documentElement.requestFullscreen().catch(() => {});
+
   try {
     const data = await apiFetch(`/api/matches/draw/${currentCategory._id}`, { method: 'POST' });
     currentMatches = data.data;
@@ -207,11 +210,24 @@ async function runDraw() {
     const menuItem = document.querySelector(`.category-menu-item[data-id="${currentCategory._id}"]`);
     if (menuItem) menuItem.classList.add('completed');
 
+    // Pre-render bracket immediately (with names hidden) so the tree is visible during animation
+    document.getElementById('bracket-section').classList.remove('hidden');
+    renderBracket(currentMatches, currentCategory);
+    // Hide all R1 athlete text groups so they reveal slot-by-slot
+    document.querySelectorAll('[id^="bracket-text-"]').forEach((el) => {
+      el.style.opacity = '0';
+    });
+
     // Only animate R1 main-bracket matches
     const r1Matches = currentMatches.filter((m) => m.roundNumber === 1 &&
       !['RepAB','RepCD','Bronze1','Bronze2'].includes(m.pool));
 
     await runSlotAnimation(r1Matches);
+
+    // Reveal any bracket text that wasn't part of the animation (later rounds show '—')
+    document.querySelectorAll('[id^="bracket-text-"]').forEach((el) => {
+      if (el.style.opacity === '0') el.style.opacity = '1';
+    });
 
     drawBtn.textContent = '✓ Kura Çekildi';
     drawBtn.disabled = true;
@@ -220,9 +236,6 @@ async function runDraw() {
     const pdfBtn = document.getElementById('pdf-btn');
     if (pdfBtn) pdfBtn.style.display = '';
 
-    // Show full bracket
-    document.getElementById('bracket-section').classList.remove('hidden');
-    renderBracket(currentMatches, currentCategory);
     // Scroll bracket into view after animation
     setTimeout(() => {
       const bs = document.getElementById('bracket-section');
@@ -255,9 +268,19 @@ async function runSlotAnimation(r1Matches) {
     if (label) label.textContent = `Maç ${i + 1}${poolLabel}: Eşleşme çekiliyor...`;
 
     await animateSlot(reel, currentAthletes, aName, label, `Maç ${i + 1}${poolLabel} — A`);
+    // Reveal athlete A in bracket tree
+    const aEl = document.getElementById(`bracket-text-${match._id}-A`);
+    if (aEl) gsap.to(aEl, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+    // Confetti only on BYE draw
+    if (match.isByeA) fireConfetti();
     await sleep(600);
 
     await animateSlot(reel, currentAthletes, bName, label, `Maç ${i + 1}${poolLabel} — B`);
+    // Reveal athlete B in bracket tree
+    const bEl = document.getElementById(`bracket-text-${match._id}-B`);
+    if (bEl) gsap.to(bEl, { opacity: 1, duration: 0.5, ease: 'power2.out' });
+    // Confetti only on BYE draw
+    if (match.isByeB) fireConfetti();
     await sleep(900);
   }
 
@@ -310,7 +333,6 @@ function animateSlot(reel, athletes, winnerName, label, labelText) {
             );
           }
           if (label) label.textContent = `✅ ${labelText}: ${winnerName}`;
-          fireConfetti();
           resolve();
         },
       }
