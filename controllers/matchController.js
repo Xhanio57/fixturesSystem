@@ -197,7 +197,7 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
       shuffle(group); // randomize within group
       // Start at the pool currently holding the fewest athletes (balanced baseline)
       let startPool = poolQueues.reduce(
-        (minP, q, p) => (q.length < poolQueues[minP].length ? p : minP), 0
+        (minPoolIndex, q, p) => (q.length < poolQueues[minPoolIndex].length ? p : minPoolIndex), 0
       );
       for (let i = 0; i < group.length; i++) {
         poolQueues[(startPool + i) % numPools].push(group[i]);
@@ -211,7 +211,7 @@ function buildBracketWithSmartSwap(athletes, bracketSize) {
   // Solo athletes fill the emptiest pool at each step
   for (const ath of soloAthletes) {
     const minPool = poolQueues.reduce(
-      (minP, q, p) => (q.length < poolQueues[minP].length ? p : minP), 0
+      (minPoolIndex, q, p) => (q.length < poolQueues[minPoolIndex].length ? p : minPoolIndex), 0
     );
     poolQueues[minPool].push(ath);
   }
