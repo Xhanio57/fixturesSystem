@@ -180,8 +180,8 @@ function buildMainBracketSvg(matches) {
       g.appendChild(badgeTxt);
     }
 
-    g.appendChild(athleteTextSvg(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 6, match.slotNumberA));
-    g.appendChild(athleteTextSvg(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 6, match.slotNumberB));
+    g.appendChild(athleteTextSvg(match.athleteA, match.isByeA, match.winner, x + 10, y + h / 4 + 6, match.slotNumberA, `bracket-text-${match._id}-A`));
+    g.appendChild(athleteTextSvg(match.athleteB, match.isByeB, match.winner, x + 10, y + (3 * h) / 4 + 6, match.slotNumberB, `bracket-text-${match._id}-B`));
 
     // Match ID circle (bottom-right corner of each match box, like the reference image)
     if (match.matchID && match.roundNumber === 1) {
@@ -307,8 +307,9 @@ function buildRepechageSvg(repMatches) {
 /* ─────────────────────────────────────────────
    SHARED HELPERS
 ───────────────────────────────────────────── */
-function athleteTextSvg(athlete, isBye, winner, x, y, slotNumber) {
+function athleteTextSvg(athlete, isBye, winner, x, y, slotNumber, groupId) {
   const g = svgEl('g');
+  if (groupId) g.setAttribute('id', groupId);
 
   // Draw position number circle (like "9." in the reference)
   // NOTE: `x` here is already matchBoxX + 10 (passed by caller as `x + 10`),

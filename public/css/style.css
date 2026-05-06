@@ -1194,3 +1194,34 @@ select.form-input option {
 }
 
 .import-result.hidden { display: none; }
+
+/* ── Fullscreen mode (draw presentation) ──────────────────── */
+:fullscreen .site-header,
+:-webkit-full-screen .site-header,
+:-moz-full-screen .site-header {
+  display: none;
+}
+
+:fullscreen .draw-sidebar,
+:-webkit-full-screen .draw-sidebar,
+:-moz-full-screen .draw-sidebar {
+  display: none;
+}
+
+:fullscreen .draw-layout,
+:-webkit-full-screen .draw-layout {
+  height: 100vh;
+}
+
+:fullscreen .draw-main,
+:-webkit-full-screen .draw-main {
+  width: 100%;
+  padding: 20px 24px;
+}
+
+:fullscreen .bracket-container svg,
+:-webkit-full-screen .bracket-container svg {
+  width: 100%;
+  height: auto;
+}
+
