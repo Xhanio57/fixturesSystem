@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Turnuva Yönetim Paneli</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <!-- Tailwind CSS (via CDN play) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            gold: { DEFAULT: '#f7c948', dark: '#c9a020' },
+            surface: { DEFAULT: '#1e1e24', raised: '#26262e' }
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="admin-page dark">
+
+  <header class="site-header">
+    <div class="header-inner">
+      <h1 class="site-title">🥋 Judo Turnuva Yönetim Sistemi</h1>
+      <nav class="header-nav">
+        <a href="/" class="nav-link active">Admin Paneli</a>
+        <a href="/kura" class="nav-link">Canlı Kura</a>
+        <a href="/sunum" class="nav-link" target="_blank">📺 Sunum</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div class="panel-grid">
+
+      <!-- LEFT: Categories -->
+      <section class="panel-section" id="categories-section">
+        <h2 class="section-title">Sikletler</h2>
+
+        <form id="category-form" class="form-card">
+          <div class="form-row flex-wrap">
+            <input type="text" id="cat-name" placeholder="-60kg" required class="form-input" />
+            <select id="cat-gender" class="form-input">
+              <option value="Erkek">Erkek</option>
+              <option value="Kadın">Kadın</option>
+              <option value="Karma">Karma</option>
+            </select>
+            <input type="text" id="cat-ageGroup" placeholder="U18, Senior..." class="form-input" />
+            <select id="cat-bracketType" class="form-input" title="Fikstür Türü">
+              <option value="DoubleRepechage">Çift Repechage</option>
+              <option value="SingleElimination">Tek Eleme</option>
+            </select>
+            <button type="submit" class="btn btn-primary">+ Ekle</button>
+          </div>
+        </form>
+
+        <div id="categories-list" class="list-container">
+          <p class="loading-text">Yükleniyor...</p>
+        </div>
+      </section>
+
+      <!-- RIGHT: Athletes -->
+      <section class="panel-section" id="athletes-section">
+        <h2 class="section-title">Sporcular</h2>
+
+        <form id="athlete-form" class="form-card">
+          <div class="form-row flex-wrap">
+            <input type="text" id="ath-firstName" placeholder="Ad" required class="form-input" />
+            <input type="text" id="ath-lastName" placeholder="Soyad" required class="form-input" />
+            <input type="text" id="ath-club" placeholder="Kulüp / Spor Kulübü" class="form-input" />
+            <input type="text" id="ath-country" placeholder="Ülke (TUR/LAT...)" class="form-input" style="width:120px;text-transform:uppercase;" maxlength="10" />
+            <select id="ath-category" class="form-input" required>
+              <option value="">Siklet seç</option>
+            </select>
+            <select id="ath-seedIndex" class="form-input" title="Seri Başı Sırası">
+              <option value="">Seri Başı Yok</option>
+              <option value="1">🥇 1. Seri Başı</option>
+              <option value="2">🥈 2. Seri Başı</option>
+              <option value="3">🥉 3. Seri Başı</option>
+              <option value="4">4. Seri Başı</option>
+            </select>
+            <button type="submit" class="btn btn-primary">+ Ekle</button>
+          </div>
+        </form>
+
+        <div class="filter-row">
+          <label>Filtrele:</label>
+          <select id="filter-category" class="form-input form-input--sm">
+            <option value="">Tüm Sikletler</option>
+          </select>
+        </div>
+
+        <!-- Excel bulk import -->
+        <div class="import-section" id="import-section">
+          <details class="import-details">
+            <summary class="import-summary">📥 Excel'den Toplu Aktar (.xlsx)</summary>
+            <div class="import-body">
+              <p class="import-hint">
+                Sütun sırası: <b>A: Ad</b>, <b>B: Soyad</b>, <b>C: Ülke</b>, <b>D: Kulüp</b>, <b>E: Seri Başı (1-4, opsiyonel)</b><br/>
+                İlk satır başlık olarak atlanır.
+              </p>
+              <div class="form-row flex-wrap" style="gap:8px;align-items:center;">
+                <select id="import-category" class="form-input">
+                  <option value="">Siklet seç</option>
+                </select>
+                <input type="file" id="import-file" accept=".xlsx,.xls" class="form-input" style="max-width:260px;" />
+                <button id="import-btn" class="btn btn-secondary" type="button">📥 İçe Aktar</button>
+              </div>
+              <div id="import-result" class="import-result hidden"></div>
+            </div>
+          </details>
+        </div>
+
+        <div id="athletes-list" class="list-container">
+          <p class="loading-text">Yükleniyor...</p>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Edit Athlete Modal -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Sporcu Düzenle</h3>
+      <input type="hidden" id="edit-id" />
+      <div class="form-group">
+        <label>Ad</label>
+        <input type="text" id="edit-firstName" class="form-input" />
+      </div>
+      <div class="form-group">
+        <label>Soyad</label>
+        <input type="text" id="edit-lastName" class="form-input" />
+      </div>
+      <div class="form-group">
+        <label>Kulüp</label>
+        <input type="text" id="edit-club" class="form-input" />
+      </div>
+      <div class="form-group">
+        <label>Ülke (TUR, LAT...)</label>
+        <input type="text" id="edit-country" class="form-input" style="text-transform:uppercase;" maxlength="10" />
+      </div>
+      <div class="form-group">
+        <label>Siklet</label>
+        <select id="edit-category" class="form-input"></select>
+      </div>
+      <div class="form-group">
+        <label>Seri Başı</label>
+        <select id="edit-seedIndex" class="form-input">
+          <option value="">Seri Başı Yok</option>
+          <option value="1">🥇 1. Seri Başı</option>
+          <option value="2">🥈 2. Seri Başı</option>
+          <option value="3">🥉 3. Seri Başı</option>
+          <option value="4">4. Seri Başı</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button id="edit-save-btn" class="btn btn-primary">Kaydet</button>
+        <button id="edit-cancel-btn" class="btn btn-secondary">İptal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Turnuva Sunum Ekranı — Judo</title>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+</head>
+<body class="spectator-page dark">
+
+  <header class="spectator-header">
+    <h1 class="spectator-title" id="spec-main-title">🥋 Turnuva Canlı Ekran</h1>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <button id="spec-pdf-btn" class="btn btn-sm btn-secondary hidden" onclick="specExportPDF()">📄 PDF İndir</button>
+      <div class="spectator-clock" id="clock">00:00:00</div>
+    </div>
+  </header>
+
+  <div class="spectator-body">
+
+    <!-- Sidebar: Category list -->
+    <aside class="spectator-sidebar">
+      <div style="padding: 0 20px 12px; border-bottom: 1px solid var(--border); margin-bottom: 8px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted);">
+        Sikletler
+      </div>
+      <ul class="category-menu" id="category-menu">
+        <% categories.forEach(cat => { %>
+          <li class="category-menu-item <%= cat.drawStatus === 'Completed' ? 'completed' : '' %>"
+              data-id="<%= cat._id %>"
+              data-slug="<%= encodeURIComponent(cat.name) %>">
+            <span class="cat-name"><%= cat.name %></span>
+            <% if (cat.gender) { %>
+              <span class="cat-meta"><%= cat.gender %><% if (cat.ageGroup) { %> · <%= cat.ageGroup %><% } %></span>
+            <% } %>
+            <% if (cat.drawStatus === 'Completed') { %>
+              <span class="badge-done">✓ Çekildi</span>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+    </aside>
+
+    <!-- Main content -->
+    <main class="spectator-main" id="spectator-main">
+
+      <!-- Placeholder -->
+      <div id="spectator-placeholder" class="placeholder-view">
+        <div class="placeholder-icon" style="font-size: 5rem;">🏆</div>
+        <p style="font-size: 1.4rem;">Soldan bir siklet seçin</p>
+        <p style="font-size: 0.9rem; opacity: 0.5; margin-top: 8px;">Admin panelinden kura çekilince otomatik görünür</p>
+      </div>
+
+      <!-- Content -->
+      <div id="spectator-content" class="hidden">
+        <h2 class="spectator-cat-title" id="spec-cat-title"></h2>
+        <p class="spectator-cat-meta" id="spec-cat-meta"></p>
+
+        <!-- Pool legend -->
+        <div id="spec-pool-legend" class="pool-legend hidden" style="justify-content: center; margin-bottom: 28px;"></div>
+
+        <!-- Bracket -->
+        <div id="spec-bracket-container" class="bracket-container" style="min-height: 300px;"></div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ─────────────────────────────────────────────────────
+       SLOT MACHINE OVERLAY (appears during live draw)
+  ──────────────────────────────────────────────────────── -->
+  <div id="spec-draw-overlay" class="spec-draw-overlay hidden">
+    <div class="spec-overlay-inner">
+      <div class="spec-overlay-header">
+        <div class="spec-overlay-cat" id="spec-overlay-cat">—</div>
+        <div class="spec-overlay-progress" id="spec-overlay-progress">Kura Başlıyor...</div>
+      </div>
+      <div class="spec-slot-machine">
+        <div class="slot-reel-container">
+          <div class="slot-reel" id="spec-slot-reel"></div>
+        </div>
+        <div class="slot-label" id="spec-slot-label">Hazırlanıyor...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fly-to-bracket container (fixed overlay for GSAP flight animation) -->
+  <div id="fly-container" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:8000;overflow:hidden;"></div>
+
+  <!-- Confetti canvas -->
+  <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9000;"></canvas>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/gsap.min.js"></script>
+  <script src="/js/bracket.js"></script>
+  <script src="/js/spectator.js"></script>
+  <script src="/js/pdf-export.js"></script>
+</body>
+</html>
